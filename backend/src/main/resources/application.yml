@@ -1,0 +1,25 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: fdp
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/fdp
+    username: fdp_user
+    password: fdp_pass
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  flyway:
+    enabled: true
+
+kroger:
+  client-id: ${KROGER_CLIENT_ID:}
+  client-secret: ${KROGER_CLIENT_SECRET:}

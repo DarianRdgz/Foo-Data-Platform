@@ -1,0 +1,17 @@
+services:
+  db:
+    image: postgres:16
+    container_name: fdp-postgres
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - fdp_pgdata:/var/lib/postgresql/data
+
+volumes:
+  fdp_pgdata:
