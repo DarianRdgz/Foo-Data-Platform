@@ -1,4 +1,4 @@
-package com.fooholdings.fdp.startup;
+package com.fooholdings.fdp.kroger.startup;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -6,7 +6,7 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import com.fooholdings.fdp.config.KrogerProperties;
+import com.fooholdings.fdp.kroger.config.KrogerProperties;
 
 @Configuration
 public class KrogerCredsStartupCheck {

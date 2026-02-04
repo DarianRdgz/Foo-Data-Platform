@@ -4,7 +4,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 
-import com.fooholdings.fdp.config.KrogerProperties;
+import com.fooholdings.fdp.kroger.config.KrogerProperties;
 
 @SpringBootApplication
 @EnableConfigurationProperties(KrogerProperties.class)

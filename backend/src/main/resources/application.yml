@@ -23,3 +23,9 @@ spring:
 kroger:
   client-id: ${KROGER_CLIENT_ID:}
   client-secret: ${KROGER_CLIENT_SECRET:}
+  api:
+    base-url: ${KROGER_API_BASE_URL:https://api-ce.kroger.com/v1}
+
+  oauth:
+    token-url: https://api-ce.kroger.com/v1/connect/oauth2/token
+    scope: product.compact
