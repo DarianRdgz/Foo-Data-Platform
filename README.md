@@ -16,6 +16,12 @@ The Foo Data Platform is designed to:
         -future API / SaaS offerings
 
 
+# Project-Management
+
+Development follows Agile Scrum methodology, tracked via a Jira board.
+Work is organized into epics, sprints, and user stories to ensure incremental and iterative progress.
+
+
 # Architecture-Overview
 
 Backend
