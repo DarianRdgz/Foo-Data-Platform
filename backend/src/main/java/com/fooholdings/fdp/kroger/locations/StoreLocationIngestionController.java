@@ -16,24 +16,17 @@ public class StoreLocationIngestionController {
     }
 
     /**
-     * Triggers a fetch + store run.
-     * Ex: POST /api/kroger/locations/ingest?zip=77002&limit=25
+     * Triggers a fetch + store run using lat/long.
+     * Ex: POST /api/kroger/locations/ingest?lat=29.7858&lon=-95.8245&limit=25
      */
     @PostMapping("/ingest")
     public StoreLocationIngestionService.IngestResult ingest(
-            @RequestParam String zip,
-            @RequestParam(defaultValue = "25") int limit
-    ) {
-        return ingestionService.ingestByZip(zip, limit);
-    }
-
-    @PostMapping("/ingest-near")
-    public StoreLocationIngestionService.IngestResult ingestNear(
             @RequestParam double lat,
             @RequestParam double lon,
             @RequestParam(defaultValue = "25") int limit
     ) {
         return ingestionService.ingestByLatLong(lat, lon, limit);
     }
+
 
 }
