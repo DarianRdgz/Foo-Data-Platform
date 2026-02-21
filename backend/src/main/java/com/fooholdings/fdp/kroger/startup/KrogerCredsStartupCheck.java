@@ -3,12 +3,18 @@ package com.fooholdings.fdp.kroger.startup;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import com.fooholdings.fdp.kroger.config.KrogerProperties;
 
 @Configuration
+@ConditionalOnProperty(
+        name = "kroger.creds.required",
+        havingValue = "true",
+        matchIfMissing = true
+)
 public class KrogerCredsStartupCheck {
     private static final Logger log = LoggerFactory.getLogger(KrogerCredsStartupCheck.class);
 
