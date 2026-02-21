@@ -2,8 +2,6 @@ services:
   db:
     image: postgres:16
     container_name: fdp-postgres
-    env_file:
-      - .env
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -12,6 +10,22 @@ services:
       - "5432:5432"
     volumes:
       - fdp_pgdata:/var/lib/postgresql/data
+      
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: fdp-backend
+    env_file:
+      - .env
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+    depends_on:
+      - db
+    ports:
+      - "8080:8080"
 
 volumes:
   fdp_pgdata:
