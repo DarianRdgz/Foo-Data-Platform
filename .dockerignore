@@ -1,3 +1,5 @@
 .env
 
 plans.txt
+
+node_modules
