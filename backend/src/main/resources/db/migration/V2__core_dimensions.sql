@@ -8,8 +8,8 @@ CREATE TABLE IF NOT EXISTS fdp_core.source_system (
 
 CREATE TABLE IF NOT EXISTS fdp_core.geo_region (
   id           BIGSERIAL PRIMARY KEY,
-  country_code CHAR(2) NOT NULL,
-  state_code   CHAR(2),
+  country_code VARCHAR(2) NOT NULL,
+  state_code   VARCHAR(2),
   county_name  TEXT,
   city_name    TEXT,
   postal_code  TEXT,

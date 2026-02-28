@@ -1,84 +1,153 @@
 package com.fooholdings.fdp.sources.kroger.client;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpHeaders;
-import org.springframework.stereotype.Service;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import com.fooholdings.fdp.core.ingestion.ApiQuotaUsageService;
+import com.fooholdings.fdp.core.ingestion.RawPayloadService;
 import com.fooholdings.fdp.sources.kroger.auth.KrogerTokenService;
 import com.fooholdings.fdp.sources.kroger.config.KrogerProperties;
 import com.fooholdings.fdp.sources.kroger.dto.locations.KrogerLocationResponse;
 import com.fooholdings.fdp.sources.kroger.dto.products.KrogerProductsResponse;
 
-@Service
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
+
+/**
+ * HTTP client adapter for the Kroger v1 API.
+ *
+ * Responsibilities:
+ *   - Build authorized requests with Bearer token
+ *   - Save EVERY response (success or failure) to fdp_core.raw_payload
+ *   - Increment api_quota_usage on every call
+ *   - Handle 401 with one token force-refresh + retry
+ *
+ * Key design decision — raw payload on error:
+ *   RestClient.retrieve() throws by default on 4xx/5xx, discarding the body.
+ *   We suppress the default error handler with .onStatus(any, no-op) to capture
+ *   the full body first, then throw manually if status is an error.
+ *   This ensures error responses are archived.
+ *
+ * 401 retry policy:
+ *   One retry after force-refresh. If the second attempt also returns 401,
+ *   we throw the credentials are invalid and retrying is pointless.
+ */
+@Component
 public class KrogerApiClient {
+
+    private static final Logger log = LoggerFactory.getLogger(KrogerApiClient.class);
+    private static final String SOURCE_CODE = "KROGER";
 
     private final RestClient restClient;
     private final KrogerTokenService tokenService;
-    private final KrogerProperties props;
-    private static final Logger log = LoggerFactory.getLogger(KrogerApiClient.class);
+    private final RawPayloadService rawPayloadService;
+    private final ApiQuotaUsageService quotaUsageService;
+    private final ObjectMapper objectMapper;
 
-
-    public KrogerApiClient(RestClient.Builder restClientBuilder,
+    public KrogerApiClient(RestClient.Builder builder,
+                           KrogerProperties props,
                            KrogerTokenService tokenService,
-                           KrogerProperties props) {
-        this.restClient = restClientBuilder.build();
+                           RawPayloadService rawPayloadService,
+                           ApiQuotaUsageService quotaUsageService,
+                           ObjectMapper objectMapper) {
         this.tokenService = tokenService;
-        this.props = props;
+        this.rawPayloadService = rawPayloadService;
+        this.quotaUsageService = quotaUsageService;
+        this.objectMapper = objectMapper;
+        this.restClient = builder
+                .baseUrl(props.getApi().getBaseUrl())
+                .build();
     }
 
-    public KrogerLocationResponse searchLocations(String zipCode, int limit) {
-        String token = tokenService.getAccessToken(); // <-- cached + refreshed automatically
-        String baseUrl = props.getApi().getBaseUrl();
+    // Public API methods
 
-        return restClient
-                .get()
-                .uri(baseUrl + "/locations?filter.zipCode=" + zipCode + "&filter.limit=" + limit)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+    /**
+     * Fetches store locations filtered by zip code.
+     *
+     * @param zipCode        5-digit zip to filter by
+     * @param ingestionRunId current run for audit linkage
+     * @return parsed response
+     */
+    public KrogerLocationResponse getLocations(String zipCode, UUID ingestionRunId) {
+        String endpoint = "GET /locations";
+        String url = "/locations?filter.zipCode.near=" + zipCode + "&filter.limit=10";
+        String body = executeGet(url, endpoint, ingestionRunId, false);
+        return parseBody(body, KrogerLocationResponse.class, endpoint);
+    }
+
+    /**
+     * Fetches products for a given location.
+     *
+     * @param locationId     Kroger location ID (from store_location.source_location_id)
+     * @param term           search term (e.g. "milk")
+     * @param ingestionRunId current run for audit linkage
+     * @return parsed response
+     */
+    public KrogerProductsResponse getProducts(String locationId, String term, UUID ingestionRunId) {
+        String endpoint = "GET /products";
+        String url = "/products?filter.locationId=" + locationId + "&filter.term=" + term + "&filter.limit=50";
+        String body = executeGet(url, endpoint, ingestionRunId, false);
+        return parseBody(body, KrogerProductsResponse.class, endpoint);
+    }
+
+    // Internal HTTP execution
+
+    /**
+     * Executes a GET request with Authorization header.
+     * Saves the raw payload on every response. Handles 401 with one retry.
+     *
+     * @param retrying true when this is the second attempt after a 401
+     */
+    private String executeGet(String url, String endpoint, UUID ingestionRunId, boolean retrying) {
+        String token = retrying
+                ? tokenService.forceRefresh()
+                : tokenService.getValidToken();
+
+        quotaUsageService.increment(SOURCE_CODE, endpoint, 1);
+
+        // Suppress default error throwing so we can capture the body first.
+        ResponseEntity<String> response = restClient.get()
+                .uri(url)
+                .header("Authorization", "Bearer " + token)
                 .retrieve()
-                .body(KrogerLocationResponse.class);
+                .onStatus(status -> true, (req, res) -> {
+                })
+                .toEntity(String.class);
+
+        int statusCode = response.getStatusCode().value();
+        String body = response.getBody();
+
+        rawPayloadService.save(SOURCE_CODE, endpoint, statusCode, body, ingestionRunId);
+
+        if (statusCode == HttpStatus.UNAUTHORIZED.value() && !retrying) {
+            log.warn("Kroger returned 401 — forcing token refresh and retrying once");
+            return executeGet(url, endpoint, ingestionRunId, true);
+        }
+
+        if (response.getStatusCode().isError()) {
+            throw new KrogerApiException(
+                    "Kroger API returned HTTP " + statusCode + " for " + endpoint +
+                    " — body saved to raw_payload for run " + ingestionRunId
+            );
+        }
+
+        return body;
     }
 
-    public KrogerLocationResponse searchLocationsNear(double lat, double lon, int limit) {
-        String token = tokenService.getAccessToken();
-        String baseUrl = props.getApi().getBaseUrl();
-
-        String uri = baseUrl + "/locations"
-                + "?filter.latLong.near=" + lat + "," + lon
-                + "&filter.limit=" + limit;
-
-        log.info("Kroger Locations URL: {}", uri);
-
-        return restClient
-                .get()
-                .uri(uri)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                .retrieve()
-                .body(KrogerLocationResponse.class);
+    private <T> T parseBody(String body, Class<T> type, String endpoint) {
+        if (body == null || body.isBlank()) {
+            throw new KrogerApiException("Empty response body from Kroger endpoint: " + endpoint);
+        }
+        try {
+            return objectMapper.readValue(body, type);
+        } catch (JacksonException e) {
+            throw new KrogerApiException("Failed to parse Kroger response for " + endpoint + ": " + e.getMessage(), e);
+        }
     }
-
-    public KrogerProductsResponse searchProducts(String locationId, String term, int limit, int start) {
-        String token = tokenService.getAccessToken();
-        String baseUrl = props.getApi().getBaseUrl();
-
-        String encodedTerm = URLEncoder.encode(term, StandardCharsets.UTF_8);
-
-        String uri = baseUrl + "/products"
-                + "?filter.term=" + encodedTerm
-                + "&filter.locationId=" + locationId
-                + "&filter.limit=" + limit
-                + "&filter.start=" + start;
-
-        return restClient
-                .get()
-                .uri(uri)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                .retrieve()
-                .body(KrogerProductsResponse.class);
-    }
-
 }

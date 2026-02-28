@@ -1,6 +1,7 @@
 package com.fooholdings.fdp.grocery.location;
 
 import java.time.Instant;
+import java.util.UUID;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -8,43 +9,71 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "store_location")
+@Table(schema = "fdp_grocery", name = "store_location")
 public class StoreLocationEntity {
 
     @Id
-    @Column(name = "location_id", length = 64, nullable = false)
-    private String locationId;
+    @Column(name = "id", columnDefinition = "uuid", updatable = false, nullable = false)
+    private UUID id;
 
-    @Column(name = "name", length = 255)
+    @Column(name = "source_system_id", nullable = false)
+    private short sourceSystemId;
+
+    @Column(name = "source_location_id", nullable = false)
+    private String sourceLocationId;
+
+    @Column(name = "chain_code")
+    private String chainCode;
+
+    @Column(name = "name", nullable = false)
     private String name;
 
-    @Column(name = "address_line1", length = 255)
+    @Column(name = "phone")
+    private String phone;
+
+    @Column(name = "address_line1")
     private String addressLine1;
 
-    @Column(name = "city", length = 120)
+    @Column(name = "city")
     private String city;
 
-    @Column(name = "state", length = 32)
-    private String state;
+    @Column(name = "state_code", length = 2)
+    private String stateCode;
 
-    @Column(name = "zip_code", length = 20)
-    private String zipCode;
+    @Column(name = "postal_code")
+    private String postalCode;
 
-    @Column(name = "created_at", nullable = false)
-    private Instant createdAt;
+    @Column(name = "country_code", length = 2)
+    private String countryCode;
 
-    @Column(name = "updated_at", nullable = false)
-    private Instant updatedAt;
+    @Column(name = "geo_region_id")
+    private Long geoRegionId;
 
-    public StoreLocationEntity() {}
+    @Column(name = "first_seen_at", nullable = false)
+    private Instant firstSeenAt;
 
-    // getters/setters
+    @Column(name = "last_seen_at", nullable = false)
+    private Instant lastSeenAt;
 
-    public String getLocationId() { return locationId; }
-    public void setLocationId(String locationId) { this.locationId = locationId; }
+    // Getters / Setters
+
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
+
+    public short getSourceSystemId() { return sourceSystemId; }
+    public void setSourceSystemId(short sourceSystemId) { this.sourceSystemId = sourceSystemId; }
+
+    public String getSourceLocationId() { return sourceLocationId; }
+    public void setSourceLocationId(String sourceLocationId) { this.sourceLocationId = sourceLocationId; }
+
+    public String getChainCode() { return chainCode; }
+    public void setChainCode(String chainCode) { this.chainCode = chainCode; }
 
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
+
+    public String getPhone() { return phone; }
+    public void setPhone(String phone) { this.phone = phone; }
 
     public String getAddressLine1() { return addressLine1; }
     public void setAddressLine1(String addressLine1) { this.addressLine1 = addressLine1; }
@@ -52,15 +81,21 @@ public class StoreLocationEntity {
     public String getCity() { return city; }
     public void setCity(String city) { this.city = city; }
 
-    public String getState() { return state; }
-    public void setState(String state) { this.state = state; }
+    public String getStateCode() { return stateCode; }
+    public void setStateCode(String stateCode) { this.stateCode = stateCode; }
 
-    public String getZipCode() { return zipCode; }
-    public void setZipCode(String zipCode) { this.zipCode = zipCode; }
+    public String getPostalCode() { return postalCode; }
+    public void setPostalCode(String postalCode) { this.postalCode = postalCode; }
 
-    public Instant getCreatedAt() { return createdAt; }
-    public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
+    public String getCountryCode() { return countryCode; }
+    public void setCountryCode(String countryCode) { this.countryCode = countryCode; }
 
-    public Instant getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
+    public Long getGeoRegionId() { return geoRegionId; }
+    public void setGeoRegionId(Long geoRegionId) { this.geoRegionId = geoRegionId; }
+
+    public Instant getFirstSeenAt() { return firstSeenAt; }
+    public void setFirstSeenAt(Instant firstSeenAt) { this.firstSeenAt = firstSeenAt; }
+
+    public Instant getLastSeenAt() { return lastSeenAt; }
+    public void setLastSeenAt(Instant lastSeenAt) { this.lastSeenAt = lastSeenAt; }
 }

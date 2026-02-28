@@ -1,24 +1,32 @@
 package com.fooholdings.fdp.core.persistence;
 
 import java.time.Instant;
+import java.util.UUID;
+
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+/**
+ * JPA entity for fdp_core.ingestion_run.
+ *
+ * JSONB handling: @JdbcTypeCode(SqlTypes.JSON) tells Hibernate 7 to map the
+ * Java String to the Postgres jsonb column type correctly.
+ */
 @Entity
-@Table(name = "ingestion_run")
+@Table(schema = "fdp_core", name = "ingestion_run")
 public class IngestionRunEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @Column(name = "id", columnDefinition = "uuid", updatable = false, nullable = false)
+    private UUID id;
 
-    @Column(name = "source", nullable = false, length = 64)
-    private String source;
+    @Column(name = "source_system_id", nullable = false)
+    private short sourceSystemId;
 
     @Column(name = "started_at", nullable = false)
     private Instant startedAt;
@@ -26,18 +34,30 @@ public class IngestionRunEntity {
     @Column(name = "finished_at")
     private Instant finishedAt;
 
-    @Column(name = "status", nullable = false, length = 20)
+    /** RUNNING | SUCCESS | FAILED | PARTIAL */
+    @Column(name = "status", nullable = false)
     private String status;
 
-    @Column(name = "message", columnDefinition = "TEXT")
+    @Column(name = "message")
     private String message;
 
-    public IngestionRunEntity() {}
+    @Column(name = "requested_scope_json")
+    @JdbcTypeCode(SqlTypes.JSON)
+    private String requestedScopeJson;
 
-    public Long getId() { return id; }
+    @Column(name = "locked_at")
+    private Instant lockedAt;
 
-    public String getSource() { return source; }
-    public void setSource(String source) { this.source = source; }
+    @Column(name = "locked_by")
+    private String lockedBy;
+
+    // Getters / Setters
+
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
+
+    public short getSourceSystemId() { return sourceSystemId; }
+    public void setSourceSystemId(short sourceSystemId) { this.sourceSystemId = sourceSystemId; }
 
     public Instant getStartedAt() { return startedAt; }
     public void setStartedAt(Instant startedAt) { this.startedAt = startedAt; }
@@ -50,4 +70,13 @@ public class IngestionRunEntity {
 
     public String getMessage() { return message; }
     public void setMessage(String message) { this.message = message; }
+
+    public String getRequestedScopeJson() { return requestedScopeJson; }
+    public void setRequestedScopeJson(String requestedScopeJson) { this.requestedScopeJson = requestedScopeJson; }
+
+    public Instant getLockedAt() { return lockedAt; }
+    public void setLockedAt(Instant lockedAt) { this.lockedAt = lockedAt; }
+
+    public String getLockedBy() { return lockedBy; }
+    public void setLockedBy(String lockedBy) { this.lockedBy = lockedBy; }
 }
