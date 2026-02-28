@@ -1,10 +1,9 @@
 package com.fooholdings.fdp.architecture;
 
-import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
-
 import org.junit.jupiter.api.Test;
 
 import com.tngtech.archunit.core.importer.ClassFileImporter;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 class Epic2ArchitectureTest {
 
@@ -14,7 +13,7 @@ class Epic2ArchitectureTest {
                 .importPackages("com.fooholdings.fdp");
 
         noClasses()
-                .that().resideInAPackage("com.fooholdings.fdp.fdp_core..")
+                .that().resideInAPackage("com.fooholdings.fdp.core..")
                 .should().dependOnClassesThat().resideInAnyPackage(
                         "com.fooholdings.fdp.sources.kroger.."
                 )

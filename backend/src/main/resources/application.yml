@@ -6,9 +6,9 @@ spring:
     name: fdp
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/fdp
-    username: ${POSTGRES_USER}
-    password: ${POSTGRES_PASSWORD}
+    url: jdbc:postgresql://db:5432/fdp
+    username: ${POSTGRES_USER:fdp}
+    password: ${POSTGRES_PASSWORD:fdp}
 
   jpa:
     hibernate:

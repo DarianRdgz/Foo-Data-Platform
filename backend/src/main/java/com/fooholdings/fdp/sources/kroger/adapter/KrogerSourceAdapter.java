@@ -50,7 +50,11 @@ public class KrogerSourceAdapter implements GrocerySourceAdapter {
 
     @Override
     public List<CanonicalLocation> fetchLocations(LocationQuery query) {
-        List<String> zipCodes = query != null ? query.zipCodes() : null;
+        if (query == null) {
+            return List.of();
+        }
+
+        List<String> zipCodes = query.zipCodes();
         if (zipCodes == null || zipCodes.isEmpty()) {
             return List.of();
         }
@@ -90,8 +94,12 @@ public class KrogerSourceAdapter implements GrocerySourceAdapter {
 
     @Override
     public List<CanonicalProductPrice> fetchProducts(ProductQuery query) {
-        List<String> locationIds = query != null ? query.locationIds() : null;
-        List<String> searchTerms = query != null ? query.searchTerms() : null;
+        if (query == null) {
+            return List.of();
+        }
+
+        List<String> locationIds = query.locationIds();
+        List<String> searchTerms = query.searchTerms();
 
         if (locationIds == null || locationIds.isEmpty() || searchTerms == null || searchTerms.isEmpty()) {
             return List.of();
