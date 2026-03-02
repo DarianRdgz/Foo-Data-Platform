@@ -1,5 +1,6 @@
 package com.fooholdings.fdp.grocery.location;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -15,4 +16,11 @@ public interface StoreLocationRepository extends JpaRepository<StoreLocationEnti
 
     Optional<StoreLocationEntity> findBySourceSystemIdAndSourceLocationId(
             short sourceSystemId, String sourceLocationId);
+
+    List<StoreLocationEntity> findTop200ByPostalCodeOrderByNameAsc(String postalCode);
+
+    List<StoreLocationEntity> findTop200BySourceSystemIdAndPostalCodeOrderByNameAsc(
+            short sourceSystemId,
+            String postalCode
+    );
 }

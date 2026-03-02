@@ -15,9 +15,9 @@ fdp/
 ```
 
 **Key design decisions:**
-- Append-only `price_observation` table with `ON CONFLICT DO NOTHING` batch inserts for idempotent ingestion
-- Table-based distributed lock (`fdp_core.ingestion_lock`) prevents concurrent ingestion runs per source
-- Every API response, success or failure, is archived to `fdp_core.raw_payload` before any exception is raised
+- Append-only price_observation table with `ON CONFLICT DO NOTHING batch inserts for idempotent ingestion
+- Table-based distributed lock (fdp_core.ingestion_lock) prevents concurrent ingestion runs per source
+- Every API response, success or failure, is archived to fdp_core.raw_payload before any exception is raised
 
 ## Tech Stack
 
@@ -34,31 +34,19 @@ fdp/
 ## Prerequisites
 
 - Docker and Docker Compose
-- A `.env` file in the project root (see below)
+- A .env file in the project root (see below)
 
 ## Environment Setup
 
-Create a `.env` file in the project root:
-
-```env
-POSTGRES_DB=fdp
-POSTGRES_USER=your_user
-POSTGRES_PASSWORD=your_password
-
-KROGER_CLIENT_ID=your_kroger_client_id
-KROGER_CLIENT_SECRET=your_kroger_client_secret
-KROGER_API_BASE_URL=https://api-ce.kroger.com/v1
-```
+Create a .env file in the project root based on .env.example
 
 ## Running the Application
 
 ```bash
-# First run or after schema changes — tears down volumes and rebuilds cleanly
-docker compose down -v
 docker compose up -d --build
 ```
 
-Flyway migrations run automatically at startup. The backend is available at `http://localhost:8080`.
+Flyway migrations run automatically at startup. The backend is available at http://localhost:8080.
 
 ```bash
 # View backend logs
@@ -114,11 +102,10 @@ Migrations live in `backend/src/main/resources/db/migration/`.
 ## Running Tests
 
 ```bash
-cd backend
-mvn test
+docker compose run --rm test
 ```
 
-Tests are unit and web-layer slice tests only — no database or external services required.
+Tests are unit and web-layer slice tests only. No database or external services required.
 
 ## Adding a New Data Source
 

@@ -23,23 +23,33 @@ import org.springframework.stereotype.Service;
 public class SourceSystemService {
 
     private final JdbcTemplate jdbc;
-    private final ConcurrentHashMap<String, Short> cache = new ConcurrentHashMap<>();
+
+    // code -> id
+    private final ConcurrentHashMap<String, Short> codeToId = new ConcurrentHashMap<>();
+    // id -> code
+    private final ConcurrentHashMap<Short, String> idToCode = new ConcurrentHashMap<>();
 
     public SourceSystemService(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
     }
 
-    /**
-     * Returns the SMALLINT id for the given source code.
-     * Caches on first call. Thread-safe via ConcurrentHashMap.computeIfAbsent.
-     *
-     * @throws IllegalStateException if no row exists with the given code
-     */
+    /** Returns the SMALLINT id for the given source code (cached). */
     public short getRequiredIdByCode(String code) {
-        return cache.computeIfAbsent(code, this::fetchFromDb);
+        short id = codeToId.computeIfAbsent(code, this::fetchIdFromDb);
+        idToCode.putIfAbsent(id, code);
+        return id;
     }
 
-    private short fetchFromDb(String code) {
+    /**
+     * Returns the code string for the given SMALLINT id (cached).
+     *
+     * @throws IllegalStateException if no row exists with the given id
+     */
+    public String getRequiredCodeById(short id) {
+        return idToCode.computeIfAbsent(id, k -> fetchCodeFromDb(k));
+    }
+
+    private short fetchIdFromDb(String code) {
         Short id = jdbc.query(
                 "SELECT id FROM fdp_core.source_system WHERE code = ?",
                 rs -> rs.next() ? rs.getShort(1) : null,
@@ -48,9 +58,26 @@ public class SourceSystemService {
         if (id == null) {
             throw new IllegalStateException(
                     "No row in fdp_core.source_system for code='" + code + "'. " +
-                    "Ensure V8__seed_source_system.sql has been applied."
+                    "Ensure your seed migration has been applied."
             );
         }
         return id;
+    }
+
+    private String fetchCodeFromDb(short id) {
+        String code = jdbc.query(
+                "SELECT code FROM fdp_core.source_system WHERE id = ?",
+                rs -> rs.next() ? rs.getString(1) : null,
+                id
+        );
+        if (code == null) {
+            throw new IllegalStateException(
+                    "No row in fdp_core.source_system for id=" + id + ". " +
+                    "Ensure your seed migration has been applied."
+            );
+        }
+        // Keep both caches warm.
+        codeToId.putIfAbsent(code, id);
+        return code;
     }
 }
