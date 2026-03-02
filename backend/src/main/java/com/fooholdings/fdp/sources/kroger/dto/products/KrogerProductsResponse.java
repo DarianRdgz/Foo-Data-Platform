@@ -17,6 +17,8 @@ public class KrogerProductsResponse {
         private String productId;
         private String upc;
         private String description;
+        private String brand;
+        private List<String> categories;
         private List<Item> items;
 
         public String getProductId() { return productId; }
@@ -27,6 +29,12 @@ public class KrogerProductsResponse {
 
         public String getDescription() { return description; }
         public void setDescription(String description) { this.description = description; }
+
+        public String getBrand() { return brand; }
+        public void setBrand(String brand) { this.brand = brand; }
+
+        public List<String> getCategories() { return categories; }
+        public void setCategories(List<String> categories) { this.categories = categories; }
 
         public List<Item> getItems() { return items; }
         public void setItems(List<Item> items) { this.items = items; }

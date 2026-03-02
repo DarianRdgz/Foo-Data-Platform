@@ -37,6 +37,10 @@ public class SourceProductEntity {
     @Column(name = "brand")
     private String brand;
 
+    @Column(name = "categories", columnDefinition = "text[]")
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    private String[] categories;
+
     @Column(name = "product_page_uri")
     private String productPageUri;
 
@@ -76,6 +80,9 @@ public class SourceProductEntity {
 
     public String getBrand() { return brand; }
     public void setBrand(String brand) { this.brand = brand; }
+
+    public String[] getCategories() { return categories; }
+public void setCategories(String[] categories) { this.categories = categories; }
 
     public String getProductPageUri() { return productPageUri; }
     public void setProductPageUri(String productPageUri) { this.productPageUri = productPageUri; }

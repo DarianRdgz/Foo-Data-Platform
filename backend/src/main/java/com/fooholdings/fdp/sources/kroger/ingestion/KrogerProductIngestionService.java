@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -125,16 +126,28 @@ public class KrogerProductIngestionService {
                         productCount++;
 
                         // Upsert source_product and get the stable internal UUID
+                        String brand = product.getBrand();
+
+                        String[] categories = (product.getCategories() == null || product.getCategories().isEmpty())
+                                ? null
+                                : product.getCategories().stream()
+                                    .filter(Objects::nonNull)
+                                    .map(String::trim)
+                                    .filter(s -> !s.isEmpty())
+                                    .distinct()
+                                    .toArray(String[]::new);
+
                         UUID sourceProductPk = sourceProductRepo.upsert(
                                 UUID.randomUUID(),
                                 sourceSystemId,
                                 product.getProductId(),
                                 product.getUpc(),
                                 product.getDescription(),
-                                null,  // brand not in current DTO
-                                null,  // product_page_uri not in current DTO
-                                null,  // raw_category_json: extend when Kroger DTO has categories
-                                null   // raw_flags_json: extend when Kroger DTO has flags
+                                brand,
+                                categories,     // ✅ NEW
+                                null,           // product_page_uri (still not in DTO)
+                                null,           // raw_category_json (optional, see note below)
+                                null                // raw_flags_json: extend when Kroger DTO has flags
                         );
 
                         // Extract price from the first item (Kroger products have 1+ items/sizes)

@@ -73,6 +73,7 @@ public class ProductQueryService {
     private ProductResponse toResponse(SourceProductEntity e) {
         // For now we only have KROGER seeded; mapping below keeps the contract stable as more sources are added.
         String sourceCode = sourceSystemService.getRequiredCodeById(e.getSourceSystemId());
+        List<String> cats = (e.getCategories() == null) ? List.of() : List.of(e.getCategories());
         return new ProductResponse(
             e.getId(),
             sourceCode,
@@ -80,10 +81,11 @@ public class ProductQueryService {
             e.getUpc(),
             e.getName(),
             e.getBrand(),
+            cats,                   
             e.getProductPageUri(),
             e.getFirstSeenAt(),
             e.getLastSeenAt()
-        );
+    );
     }
 
     private int normalizeLimit(Integer limit) {
