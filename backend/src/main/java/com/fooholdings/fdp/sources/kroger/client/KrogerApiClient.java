@@ -11,6 +11,7 @@ import org.springframework.web.client.RestClient;
 
 import com.fooholdings.fdp.core.ingestion.ApiQuotaUsageService;
 import com.fooholdings.fdp.core.ingestion.RawPayloadService;
+import com.fooholdings.fdp.core.logging.MdcScope;
 import com.fooholdings.fdp.sources.kroger.auth.KrogerTokenService;
 import com.fooholdings.fdp.sources.kroger.config.KrogerProperties;
 import com.fooholdings.fdp.sources.kroger.dto.locations.KrogerLocationResponse;
@@ -105,40 +106,39 @@ public class KrogerApiClient {
      * @param retrying true when this is the second attempt after a 401
      */
     private String executeGet(String url, String endpoint, UUID ingestionRunId, boolean retrying) {
-        String token = retrying
-                ? tokenService.forceRefresh()
-                : tokenService.getValidToken();
+        try (@SuppressWarnings("unused") var ignored = MdcScope.with("endpoint", endpoint)) {
+            String token = retrying ? tokenService.forceRefresh() : tokenService.getValidToken();
 
-        quotaUsageService.increment(SOURCE_CODE, endpoint, 1);
+            quotaUsageService.increment(SOURCE_CODE, endpoint, 1);
 
-        // Suppress default error throwing so we can capture the body first.
-        ResponseEntity<String> response = restClient.get()
-                .uri(url)
-                .header("Authorization", "Bearer " + token)
-                .retrieve()
-                .onStatus(status -> true, (req, res) -> {
-                })
-                .toEntity(String.class);
+            ResponseEntity<String> response = restClient.get()
+                    .uri(url)
+                    .header("Authorization", "Bearer " + token)
+                    .retrieve()
+                    .onStatus(status -> true, (req, res) -> {})
+                    .toEntity(String.class);
 
-        int statusCode = response.getStatusCode().value();
-        String body = response.getBody();
+            int statusCode = response.getStatusCode().value();
+            String body = response.getBody();
 
-        rawPayloadService.save(SOURCE_CODE, endpoint, statusCode, body, ingestionRunId);
+            rawPayloadService.save(SOURCE_CODE, endpoint, statusCode, body, ingestionRunId);
 
-        if (statusCode == HttpStatus.UNAUTHORIZED.value() && !retrying) {
-            log.warn("Kroger returned 401 — forcing token refresh and retrying once");
-            return executeGet(url, endpoint, ingestionRunId, true);
-        }
+            if (statusCode == HttpStatus.UNAUTHORIZED.value() && !retrying) {
+                log.warn("Kroger returned 401 - forcing token refresh and retrying once");
+                return executeGet(url, endpoint, ingestionRunId, true);
+            }
 
-        if (response.getStatusCode().isError()) {
-            throw new KrogerApiException(
+            if (response.getStatusCode().isError()) {
+                throw new KrogerApiException(
                     "Kroger API returned HTTP " + statusCode + " for " + endpoint +
-                    " — body saved to raw_payload for run " + ingestionRunId
-            );
-        }
+                    " - body saved to raw_payload for run " + ingestionRunId
+                );
+            }
 
-        return body;
+            return body;
+        }
     }
+
 
     private <T> T parseBody(String body, Class<T> type, String endpoint) {
         if (body == null || body.isBlank()) {

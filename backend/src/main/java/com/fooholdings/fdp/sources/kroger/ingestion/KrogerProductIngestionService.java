@@ -6,21 +6,26 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 
+import com.fooholdings.fdp.core.ingestion.IngestionLockException;
 import com.fooholdings.fdp.core.ingestion.IngestionLockService;
 import com.fooholdings.fdp.core.ingestion.IngestionRunService;
+import com.fooholdings.fdp.core.logging.ErrorCategory;
+import com.fooholdings.fdp.core.logging.ErrorCategoryMdc;
+import com.fooholdings.fdp.core.logging.IngestionMdc;
 import com.fooholdings.fdp.core.source.SourceSystemService;
 import com.fooholdings.fdp.grocery.location.StoreLocationRepository;
 import com.fooholdings.fdp.grocery.price.PriceObservationJdbcRepository;
 import com.fooholdings.fdp.grocery.price.PriceObservationJdbcRepository.PriceObservationRow;
 import com.fooholdings.fdp.grocery.product.SourceProductJdbcRepository;
 import com.fooholdings.fdp.sources.kroger.client.KrogerApiClient;
+import com.fooholdings.fdp.sources.kroger.client.KrogerApiException;
 import com.fooholdings.fdp.sources.kroger.dto.products.KrogerProductsResponse;
 import com.fooholdings.fdp.sources.kroger.dto.products.KrogerProductsResponse.Item;
 import com.fooholdings.fdp.sources.kroger.dto.products.KrogerProductsResponse.Price;
@@ -84,8 +89,7 @@ public class KrogerProductIngestionService {
      */
     public String ingest(List<String> locationIds, List<String> searchTerms) {
         if (!lockService.tryAcquire(SOURCE_CODE, LOCKED_BY, LOCK_TTL)) {
-            throw new IllegalStateException(
-                    "Kroger product ingestion is already running. Try again later.");
+            throw new IngestionLockException("Kroger product ingestion is already running. Try again later.");
         }
 
         UUID runId = null;
@@ -96,104 +100,124 @@ public class KrogerProductIngestionService {
                     LOCKED_BY
             );
 
-            short sourceSystemId = sourceSystemService.getRequiredIdByCode(SOURCE_CODE);
-            List<PriceObservationRow> priceRows = new ArrayList<>();
-            int productCount = 0;
-            Instant observedAt = Instant.now(); // All observations in this run share the same timestamp
+            try (@SuppressWarnings("unused") var ctx = IngestionMdc.withRun(runId, SOURCE_CODE)) {
 
-            for (String locationId : locationIds) {
-                // Look up the internal UUID for this Kroger location
-                var locationEntity = locationRepo
-                        .findBySourceSystemIdAndSourceLocationId(sourceSystemId, locationId)
-                        .orElse(null);
+                short sourceSystemId = sourceSystemService.getRequiredIdByCode(SOURCE_CODE);
+                List<PriceObservationRow> priceRows = new ArrayList<>();
+                int productCount = 0;
+                Instant observedAt = Instant.now();
 
-                if (locationEntity == null) {
-                    log.warn("[run:{}] Skipping locationId={} — not found in store_location. " +
-                             "Run location ingestion first.", runId, locationId);
-                    continue;
-                }
+                log.info("Ingestion started: products (locations={}, terms={})", locationIds.size(), searchTerms.size());
 
-                UUID storeLocationPk = locationEntity.getId();
+                for (String locationId : locationIds) {
+                    var locationEntity = locationRepo
+                            .findBySourceSystemIdAndSourceLocationId(sourceSystemId, locationId)
+                            .orElse(null);
 
-                for (String term : searchTerms) {
-                    log.debug("[run:{}] Fetching products — location={}, term={}", runId, locationId, term);
+                    if (locationEntity == null) {
+                        try (@SuppressWarnings("unused") var cat = ErrorCategoryMdc.with(ErrorCategory.VALIDATION_ERROR)) {
+                            log.warn("Skipping locationId={} — not found in store_location. Run location ingestion first.", locationId);
+                        }
+                        continue;
+                    }
 
-                    KrogerProductsResponse response = apiClient.getProducts(locationId, term, runId);
-                    List<Product> products = response.getData();
-                    if (products == null || products.isEmpty()) continue;
+                    UUID storeLocationPk = locationEntity.getId();
 
-                    for (Product product : products) {
-                        productCount++;
+                    for (String term : searchTerms) {
+                        log.debug("Fetching products — location={}, term={}", locationId, term);
 
-                        // Upsert source_product and get the stable internal UUID
-                        String brand = product.getBrand();
+                        KrogerProductsResponse response = apiClient.getProducts(locationId, term, runId);
+                        List<Product> products = response.getData();
+                        if (products == null || products.isEmpty()) continue;
 
-                        String[] categories = (product.getCategories() == null || product.getCategories().isEmpty())
-                                ? null
-                                : product.getCategories().stream()
-                                    .filter(Objects::nonNull)
-                                    .map(String::trim)
-                                    .filter(s -> !s.isEmpty())
-                                    .distinct()
-                                    .toArray(String[]::new);
+                        for (Product product : products) {
+                            productCount++;
 
-                        UUID sourceProductPk = sourceProductRepo.upsert(
+                            UUID sourceProductPk = sourceProductRepo.upsert(
                                 UUID.randomUUID(),
                                 sourceSystemId,
                                 product.getProductId(),
                                 product.getUpc(),
-                                product.getDescription(),
-                                brand,
-                                categories,     // ✅ NEW
-                                null,           // product_page_uri (still not in DTO)
-                                null,           // raw_category_json (optional, see note below)
-                                null                // raw_flags_json: extend when Kroger DTO has flags
+                                product.getDescription(),  // name/description
+                                product.getBrand(),        // brand
+                                toCategoriesArray(product.getCategories()), // categories (String[])
+                                null,                      // product_page_uri
+                                null,                      // raw_category_json 
+                                null                       // raw_flags_json 
                         );
 
-                        // Extract price from the first item (Kroger products have 1+ items/sizes)
-                        Price price = extractFirstPrice(product);
-                        if (price == null) continue;
+                            Price price = extractFirstPrice(product);
+                            if (price == null) continue;
 
-                        BigDecimal regular = price.getRegular() != null
-                                ? BigDecimal.valueOf(price.getRegular()) : null;
-                        BigDecimal promo = price.getPromo() != null
-                                ? BigDecimal.valueOf(price.getPromo()) : null;
+                            BigDecimal regular = price.getRegular() != null ? BigDecimal.valueOf(price.getRegular()) : null;
+                            BigDecimal promo = price.getPromo() != null ? BigDecimal.valueOf(price.getPromo()) : null;
 
-                        priceRows.add(new PriceObservationRow(
-                                sourceSystemId,
-                                storeLocationPk,
-                                sourceProductPk,
-                                observedAt,
-                                CURRENCY_CODE,
-                                promo != null ? promo : regular,  // effective price
-                                regular,
-                                promo,
-                                promo != null && regular != null && promo.compareTo(regular) < 0,
-                                runId,
-                                null  // rawPayloadId: could link here but the API call is 1:many, skip for now
-                        ));
+                            priceRows.add(new PriceObservationRow(
+                                    sourceSystemId,
+                                    storeLocationPk,
+                                    sourceProductPk,
+                                    observedAt,
+                                    CURRENCY_CODE,
+                                    promo != null ? promo : regular,
+                                    regular,
+                                    promo,
+                                    promo != null && regular != null && promo.compareTo(regular) < 0,
+                                    runId,
+                                    null
+                            ));
+                        }
                     }
                 }
-            }
 
-            int inserted = priceObsRepo.batchInsert(priceRows);
-            String summary = String.format(
-                    "Products: %d processed, %d/%d price observations inserted (remainder duplicates)",
-                    productCount, inserted, priceRows.size());
-            runService.finishSuccess(runId, summary);
-            return summary;
+                int inserted = priceObsRepo.batchInsert(priceRows);
+                String summary = String.format(
+                        "Products: %d processed, %d/%d price observations inserted (remainder duplicates)",
+                        productCount, inserted, priceRows.size());
+                runService.finishSuccess(runId, summary);
+
+                log.info("Ingestion completed: {}", summary);
+                return summary;
+            }
 
         } catch (Exception e) {
             if (runId != null) runService.finishFailure(runId, e);
+
+            ErrorCategory category = classify(e);
+            try (@SuppressWarnings("unused") var cat = ErrorCategoryMdc.with(category)) {
+                if (category == ErrorCategory.LOCK_ERROR || category == ErrorCategory.VALIDATION_ERROR) {
+                    log.warn("Ingestion failed: {}", e.getMessage());
+                } else {
+                    log.error("Ingestion failed: {}", e.getMessage(), e);
+                }
+            }
             throw e;
+
         } finally {
             lockService.release(SOURCE_CODE, LOCKED_BY);
         }
+    }
+
+    private static ErrorCategory classify(Throwable e) {
+        if (e instanceof IngestionLockException) return ErrorCategory.LOCK_ERROR;
+        if (e instanceof KrogerApiException) return ErrorCategory.API_ERROR;
+        if (e instanceof DataAccessException) return ErrorCategory.DB_ERROR;
+        if (e instanceof IllegalArgumentException) return ErrorCategory.VALIDATION_ERROR;
+        return ErrorCategory.UNCLASSIFIED;
     }
 
     private static Price extractFirstPrice(Product product) {
         if (product.getItems() == null || product.getItems().isEmpty()) return null;
         Item first = product.getItems().get(0);
         return first != null ? first.getPrice() : null;
+    }
+
+    private static String[] toCategoriesArray(java.util.List<String> categories) {
+        if (categories == null || categories.isEmpty()) return null;
+        return categories.stream()
+                .filter(java.util.Objects::nonNull)
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .distinct()
+                .toArray(String[]::new);
     }
 }

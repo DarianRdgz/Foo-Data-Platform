@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+  <!-- Ensures error_category exists on WARN/ERROR even if dev forgets to set it -->
+  <turboFilter class="com.fooholdings.fdp.core.logging.ErrorCategoryTurboFilter"/>
+
+  <!-- Non-ERROR: JSON, NO stack traces -->
+  <appender name="JSON_NON_ERROR" class="ch.qos.logback.core.ConsoleAppender">
+    <filter class="ch.qos.logback.classic.filter.LevelFilter">
+      <level>ERROR</level>
+      <onMatch>DENY</onMatch>
+      <onMismatch>NEUTRAL</onMismatch>
+    </filter>
+
+    <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+      <providers>
+        <timestamp/>
+        <logLevel/>
+        <threadName/>
+        <loggerName/>
+        <message/>
+        <mdc/>
+      </providers>
+    </encoder>
+  </appender>
+
+  <!-- ERROR: JSON + stack traces -->
+  <appender name="JSON_ERROR" class="ch.qos.logback.core.ConsoleAppender">
+    <filter class="ch.qos.logback.classic.filter.LevelFilter">
+      <level>ERROR</level>
+      <onMatch>ACCEPT</onMatch>
+      <onMismatch>DENY</onMismatch>
+    </filter>
+
+    <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+      <providers>
+        <timestamp/>
+        <logLevel/>
+        <threadName/>
+        <loggerName/>
+        <message/>
+        <mdc/>
+        <stackTrace/>
+      </providers>
+    </encoder>
+  </appender>
+
+  <root level="INFO">
+    <appender-ref ref="JSON_NON_ERROR"/>
+    <appender-ref ref="JSON_ERROR"/>
+  </root>
+
+</configuration>

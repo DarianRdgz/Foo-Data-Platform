@@ -19,7 +19,8 @@ import jakarta.validation.constraints.NotEmpty;
  * Trigger endpoints for Kroger data ingestion.
  * Consolidates location and product ingestion under /kroger/ingestion.
  *
- * All endpoints are synchronous
+ * Lock contention (IngestionLockException) and other failures are handled
+ * globally by ApiExceptionHandler — no try/catch needed here.
  *
  * POST /kroger/ingestion/locations  — triggers location ingestion for given zip codes
  * POST /kroger/ingestion/products   — triggers product/price ingestion for given locations + terms
@@ -29,48 +30,37 @@ import jakarta.validation.constraints.NotEmpty;
 public class KrogerIngestionController {
 
     private final KrogerLocationIngestionService locationIngestionService;
-    private final KrogerProductIngestionService productIngestionService;
+    private final KrogerProductIngestionService  productIngestionService;
 
     public KrogerIngestionController(KrogerLocationIngestionService locationIngestionService,
                                      KrogerProductIngestionService productIngestionService) {
         this.locationIngestionService = locationIngestionService;
-        this.productIngestionService = productIngestionService;
+        this.productIngestionService  = productIngestionService;
     }
 
     /**
      * Triggers location ingestion for the supplied zip codes.
-     *
      * Request body: { "zipCodes": ["77001", "77002"] }
      */
     @PostMapping("/locations")
     public ResponseEntity<Map<String, Object>> triggerLocations(
             @Valid @RequestBody LocationIngestionRequest request) {
-        try {
-            String summary = locationIngestionService.ingest(request.zipCodes());
-            return ResponseEntity.ok(Map.of("status", "SUCCESS", "summary", summary));
-        } catch (IllegalStateException e) {
-            // Lock contention
-            return ResponseEntity.status(409).body(Map.of("status", "LOCKED", "message", e.getMessage()));
-        }
+        String summary = locationIngestionService.ingest(request.zipCodes());
+        return ResponseEntity.ok(Map.of("status", "SUCCESS", "summary", summary));
     }
 
     /**
      * Triggers product and price ingestion for the supplied location IDs and search terms.
-     *
      * Request body: { "locationIds": ["70100277"], "searchTerms": ["milk", "bread"] }
      */
     @PostMapping("/products")
     public ResponseEntity<Map<String, Object>> triggerProducts(
             @Valid @RequestBody ProductIngestionRequest request) {
-        try {
-            String summary = productIngestionService.ingest(request.locationIds(), request.searchTerms());
-            return ResponseEntity.ok(Map.of("status", "SUCCESS", "summary", summary));
-        } catch (IllegalStateException e) {
-            return ResponseEntity.status(409).body(Map.of("status", "LOCKED", "message", e.getMessage()));
-        }
+        String summary = productIngestionService.ingest(request.locationIds(), request.searchTerms());
+        return ResponseEntity.ok(Map.of("status", "SUCCESS", "summary", summary));
     }
 
-    // Request records
+    // ── Request records ───────────────────────────────────────────────────────
 
     public record LocationIngestionRequest(
             @NotEmpty(message = "At least one zip code is required")

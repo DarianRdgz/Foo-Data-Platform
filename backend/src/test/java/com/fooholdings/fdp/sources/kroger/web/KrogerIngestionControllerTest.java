@@ -52,7 +52,7 @@ class KrogerIngestionControllerTest {
     @Test
     void triggerLocations_returns409WhenLocked() throws Exception {
         when(locationIngestionService.ingest(anyList()))
-                .thenThrow(new IllegalStateException("already running"));
+                .thenThrow(new com.fooholdings.fdp.core.ingestion.IngestionLockException("already running"));
 
         mockMvc.perform(post("/kroger/ingestion/locations")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -95,7 +95,7 @@ class KrogerIngestionControllerTest {
     @Test
     void triggerProducts_returns409WhenLocked() throws Exception {
         when(productIngestionService.ingest(anyList(), anyList()))
-                .thenThrow(new IllegalStateException("already running"));
+                .thenThrow(new com.fooholdings.fdp.core.ingestion.IngestionLockException("already running"));
 
         mockMvc.perform(post("/kroger/ingestion/products")
                         .contentType(MediaType.APPLICATION_JSON)

@@ -7,13 +7,19 @@ import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 
+import com.fooholdings.fdp.core.ingestion.IngestionLockException;
 import com.fooholdings.fdp.core.ingestion.IngestionLockService;
 import com.fooholdings.fdp.core.ingestion.IngestionRunService;
+import com.fooholdings.fdp.core.logging.ErrorCategory;
+import com.fooholdings.fdp.core.logging.ErrorCategoryMdc;
+import com.fooholdings.fdp.core.logging.IngestionMdc;
 import com.fooholdings.fdp.core.source.SourceSystemService;
 import com.fooholdings.fdp.grocery.location.StoreLocationJdbcRepository;
 import com.fooholdings.fdp.sources.kroger.client.KrogerApiClient;
+import com.fooholdings.fdp.sources.kroger.client.KrogerApiException;
 import com.fooholdings.fdp.sources.kroger.dto.locations.KrogerLocationResponse;
 import com.fooholdings.fdp.sources.kroger.dto.locations.KrogerLocationResponse.Location;
 
@@ -70,8 +76,7 @@ public class KrogerLocationIngestionService {
      */
     public String ingest(List<String> zipCodes) {
         if (!lockService.tryAcquire(SOURCE_CODE, LOCKED_BY, LOCK_TTL)) {
-            throw new IllegalStateException(
-                    "Kroger location ingestion is already running. Try again later.");
+            throw new IngestionLockException("Kroger location ingestion is already running. Try again later.");
         }
 
         UUID runId = null;
@@ -82,47 +87,73 @@ public class KrogerLocationIngestionService {
                     LOCKED_BY
             );
 
-            int total = 0;
-            int upserted = 0;
-            short sourceSystemId = sourceSystemService.getRequiredIdByCode(SOURCE_CODE);
+            try (@SuppressWarnings("unused") var ctx = IngestionMdc.withRun(runId, SOURCE_CODE)) {
 
-            for (String zip : zipCodes) {
-                log.info("[run:{}] Fetching locations for zip={}", runId, zip);
-                KrogerLocationResponse response = apiClient.getLocations(zip, runId);
-                List<Location> locations = response.getData();
-                if (locations == null || locations.isEmpty()) {
-                    log.debug("[run:{}] No locations returned for zip={}", runId, zip);
-                    continue;
+                int total = 0;
+                int upserted = 0;
+                short sourceSystemId = sourceSystemService.getRequiredIdByCode(SOURCE_CODE);
+
+                log.info("Ingestion started: locations (zips={})", zipCodes.size());
+
+                for (String zip : zipCodes) {
+                    log.info("Fetching locations for zip={}", zip);
+
+                    KrogerLocationResponse response = apiClient.getLocations(zip, runId);
+                    List<Location> locations = response.getData();
+                    if (locations == null || locations.isEmpty()) {
+                        log.debug("No locations returned for zip={}", zip);
+                        continue;
+                    }
+
+                    for (Location loc : locations) {
+                        total++;
+                        locationRepo.upsert(
+                                UUID.randomUUID(),
+                                sourceSystemId,
+                                loc.getLocationId(),
+                                "KROGER",
+                                loc.getName(),
+                                null,
+                                loc.getAddress() != null ? loc.getAddress().getAddressLine1() : null,
+                                loc.getAddress() != null ? loc.getAddress().getCity() : null,
+                                loc.getAddress() != null ? loc.getAddress().getState() : null,
+                                loc.getAddress() != null ? loc.getAddress().getZipCode() : null,
+                                "US"
+                        );
+                        upserted++;
+                    }
                 }
 
-                for (Location loc : locations) {
-                    total++;
-                    locationRepo.upsert(
-                            UUID.randomUUID(),
-                            sourceSystemId,
-                            loc.getLocationId(),
-                            "KROGER",
-                            loc.getName(),
-                            null, // phone not in current DTO
-                            loc.getAddress() != null ? loc.getAddress().getAddressLine1() : null,
-                            loc.getAddress() != null ? loc.getAddress().getCity() : null,
-                            loc.getAddress() != null ? loc.getAddress().getState() : null,
-                            loc.getAddress() != null ? loc.getAddress().getZipCode() : null,
-                            "US"
-                    );
-                    upserted++;
-                }
+                String summary = "Processed " + total + " locations across " + zipCodes.size() + " zip(s). Upserted: " + upserted;
+                runService.finishSuccess(runId, summary);
+
+                log.info("Ingestion completed: {}", summary);
+                return summary;
             }
-
-            String summary = "Processed " + total + " locations across " + zipCodes.size() + " zip(s). Upserted: " + upserted;
-            runService.finishSuccess(runId, summary);
-            return summary;
 
         } catch (Exception e) {
             if (runId != null) runService.finishFailure(runId, e);
+
+            ErrorCategory category = classify(e);
+            try (@SuppressWarnings("unused") var cat = ErrorCategoryMdc.with(category)) {
+                if (category == ErrorCategory.LOCK_ERROR || category == ErrorCategory.VALIDATION_ERROR) {
+                    log.warn("Ingestion failed: {}", e.getMessage());
+                } else {
+                    log.error("Ingestion failed: {}", e.getMessage(), e);
+                }
+            }
             throw e;
+
         } finally {
             lockService.release(SOURCE_CODE, LOCKED_BY);
         }
+    }
+
+    private static ErrorCategory classify(Throwable e) {
+        if (e instanceof IngestionLockException) return ErrorCategory.LOCK_ERROR;
+        if (e instanceof KrogerApiException) return ErrorCategory.API_ERROR;
+        if (e instanceof DataAccessException) return ErrorCategory.DB_ERROR;
+        if (e instanceof IllegalArgumentException) return ErrorCategory.VALIDATION_ERROR;
+        return ErrorCategory.UNCLASSIFIED;
     }
 }
