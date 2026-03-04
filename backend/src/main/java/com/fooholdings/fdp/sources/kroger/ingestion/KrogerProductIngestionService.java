@@ -52,7 +52,7 @@ public class KrogerProductIngestionService {
 
     private static final Logger log = LoggerFactory.getLogger(KrogerProductIngestionService.class);
     private static final String SOURCE_CODE = "KROGER";
-    private static final String LOCKED_BY = "fdp-backend";
+    private static final String DEFAULT_LOCKED_BY = "fdp-backend";
     private static final Duration LOCK_TTL = Duration.ofMinutes(30);
     private static final String CURRENCY_CODE = "USD";
 
@@ -81,14 +81,29 @@ public class KrogerProductIngestionService {
     }
 
     /**
-     * Ingests products and price observations for the given location IDs and search terms.
+     * Manual trigger entry point. Uses the default lockedBy value.
      *
-     * @param locationIds  Kroger location IDs (source_location_id values from store_location)
-     * @param searchTerms  product search terms to query (e.g. ["milk", "bread", "eggs"])
+     * @param locationIds  Kroger location IDs from store_location
+     * @param searchTerms  product search terms to query
      * @return summary message from the completed run
+     * @throws IngestionLockException if a run is already in progress
      */
     public String ingest(List<String> locationIds, List<String> searchTerms) {
-        if (!lockService.tryAcquire(SOURCE_CODE, LOCKED_BY, LOCK_TTL)) {
+        return ingest(locationIds, searchTerms, DEFAULT_LOCKED_BY);
+    }
+
+    /**
+     * Full entry point — accepts a caller identity written to ingestion_run.locked_by.
+     * Scheduled jobs pass lockedBy="scheduler"; manual triggers use the no-arg overload.
+     *
+     * @param locationIds  Kroger location IDs from store_location
+     * @param searchTerms  product search terms to query
+     * @param lockedBy     identity of the caller, recorded in ingestion_run
+     * @return summary message from the completed run
+     * @throws IngestionLockException if a run is already in progress
+     */
+    public String ingest(List<String> locationIds, List<String> searchTerms, String lockedBy) {
+        if (!lockService.tryAcquire(SOURCE_CODE, lockedBy, LOCK_TTL)) {
             throw new IngestionLockException("Kroger product ingestion is already running. Try again later.");
         }
 
@@ -97,7 +112,7 @@ public class KrogerProductIngestionService {
             runId = runService.startRun(
                     SOURCE_CODE,
                     Map.of("type", "products", "locationIds", locationIds, "searchTerms", searchTerms),
-                    LOCKED_BY
+                    lockedBy
             );
 
             try (@SuppressWarnings("unused") var ctx = IngestionMdc.withRun(runId, SOURCE_CODE)) {
@@ -193,7 +208,7 @@ public class KrogerProductIngestionService {
             throw e;
 
         } finally {
-            lockService.release(SOURCE_CODE, LOCKED_BY);
+            lockService.release(SOURCE_CODE, lockedBy);
         }
     }
 

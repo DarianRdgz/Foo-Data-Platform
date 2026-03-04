@@ -29,3 +29,23 @@ kroger:
   oauth:
     token-url: https://api-ce.kroger.com/v1/connect/oauth2/token
     scope: product.compact
+
+fdp:
+  scheduler:
+    kroger:
+      enabled: false                  # flip to true via admin dashboard when ready
+      locations:
+        cron: "0 0 2 * * *"          # 2:00am daily (sec min hour day month weekday)
+        zipCodes:
+          - "77002"
+          - "77003"
+          - "77004"
+      products:
+        cron: "0 30 2 * * *"         # 2:30am daily (runs after locations)
+        locationIds: []               # populate with real Kroger location IDs from store_location
+        searchTerms:
+          - "milk"
+          - "eggs"
+          - "bread"
+          - "rice"
+          - "chicken"

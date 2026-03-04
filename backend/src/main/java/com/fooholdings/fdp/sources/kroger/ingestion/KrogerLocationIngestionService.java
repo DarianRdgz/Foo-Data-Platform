@@ -27,27 +27,23 @@ import com.fooholdings.fdp.sources.kroger.dto.locations.KrogerLocationResponse.L
  * Orchestrates the full lifecycle of a Kroger location ingestion run.
  *
  * Flow:
- *   1. Acquire distributed ingestion lock (prevents concurrent runs)
- *   2. Start ingestion_run record in RUNNING state
- *   3. Call Kroger /locations API for each zip code
- *   4. Upsert each location to fdp_grocery.store_location
- *   5. Mark run SUCCESS
+ *   1. Acquire distributed lock — throws IngestionLockException if already held
+ *   2. Start ingestion_run record (lockedBy identifies the caller: "fdp-backend" or "scheduler")
+ *   3. Open IngestionMdc scope — all subsequent logs carry ingestion_run_id + source
+ *   4. Call Kroger /locations API for each zip code and upsert to store_location
+ *   5. Mark run SUCCESS / FAILED
  *   6. Release lock (always in finally)
  *
- * If any step throws, the run is marked FAILED and the lock is released.
- * The raw payload is always saved by KrogerApiClient before exceptions propagate.
- *
- * Lock TTL is set to 20 minutes. The typical location run completes in under
- * 2 minutes for a small zip list. If the process crashes mid-run the lock
- * will auto-expire and the next invocation will succeed.
+ * Manual API triggers call ingest(zipCodes) — uses lockedBy="fdp-backend".
+ * Scheduled jobs call ingest(zipCodes, "scheduler") — written to ingestion_run.locked_by.
  */
 @Service
 public class KrogerLocationIngestionService {
 
     private static final Logger log = LoggerFactory.getLogger(KrogerLocationIngestionService.class);
-    private static final String SOURCE_CODE = "KROGER";
-    private static final String LOCKED_BY = "fdp-backend";
-    private static final Duration LOCK_TTL = Duration.ofMinutes(20);
+    private static final String SOURCE_CODE      = "KROGER";
+    private static final String DEFAULT_LOCKED_BY = "fdp-backend";
+    private static final Duration LOCK_TTL       = Duration.ofMinutes(20);
 
     private final KrogerApiClient apiClient;
     private final StoreLocationJdbcRepository locationRepo;
@@ -68,15 +64,29 @@ public class KrogerLocationIngestionService {
     }
 
     /**
-     * Ingests Kroger store locations for the given zip codes.
+     * Manual trigger entry point — uses the default lockedBy value.
      *
-     * @param zipCodes list of 5-digit zip codes to fetch (e.g. ["77001", "77002"])
+     * @param zipCodes list of 5-digit zip codes to fetch
      * @return summary message from the completed run
-     * @throws IllegalStateException if the ingestion lock cannot be acquired
+     * @throws IngestionLockException if a run is already in progress
      */
     public String ingest(List<String> zipCodes) {
-        if (!lockService.tryAcquire(SOURCE_CODE, LOCKED_BY, LOCK_TTL)) {
-            throw new IngestionLockException("Kroger location ingestion is already running. Try again later.");
+        return ingest(zipCodes, DEFAULT_LOCKED_BY);
+    }
+
+    /**
+     * Full entry point — accepts a caller identity written to ingestion_run.locked_by.
+     * Scheduled jobs pass lockedBy="scheduler"; manual triggers use the no-arg overload.
+     *
+     * @param zipCodes list of 5-digit zip codes to fetch
+     * @param lockedBy identity of the caller, recorded in ingestion_run
+     * @return summary message from the completed run
+     * @throws IngestionLockException if a run is already in progress
+     */
+    public String ingest(List<String> zipCodes, String lockedBy) {
+        if (!lockService.tryAcquire(SOURCE_CODE, lockedBy, LOCK_TTL)) {
+            throw new IngestionLockException(
+                    "Kroger location ingestion is already running. Try again later.");
         }
 
         UUID runId = null;
@@ -84,12 +94,12 @@ public class KrogerLocationIngestionService {
             runId = runService.startRun(
                     SOURCE_CODE,
                     Map.of("type", "locations", "zipCodes", zipCodes),
-                    LOCKED_BY
+                    lockedBy
             );
 
             try (@SuppressWarnings("unused") var ctx = IngestionMdc.withRun(runId, SOURCE_CODE)) {
 
-                int total = 0;
+                int total    = 0;
                 int upserted = 0;
                 short sourceSystemId = sourceSystemService.getRequiredIdByCode(SOURCE_CODE);
 
@@ -115,18 +125,18 @@ public class KrogerLocationIngestionService {
                                 loc.getName(),
                                 null,
                                 loc.getAddress() != null ? loc.getAddress().getAddressLine1() : null,
-                                loc.getAddress() != null ? loc.getAddress().getCity() : null,
-                                loc.getAddress() != null ? loc.getAddress().getState() : null,
-                                loc.getAddress() != null ? loc.getAddress().getZipCode() : null,
+                                loc.getAddress() != null ? loc.getAddress().getCity()         : null,
+                                loc.getAddress() != null ? loc.getAddress().getState()        : null,
+                                loc.getAddress() != null ? loc.getAddress().getZipCode()      : null,
                                 "US"
                         );
                         upserted++;
                     }
                 }
 
-                String summary = "Processed " + total + " locations across " + zipCodes.size() + " zip(s). Upserted: " + upserted;
+                String summary = "Processed " + total + " locations across " +
+                        zipCodes.size() + " zip(s). Upserted: " + upserted;
                 runService.finishSuccess(runId, summary);
-
                 log.info("Ingestion completed: {}", summary);
                 return summary;
             }
@@ -145,15 +155,15 @@ public class KrogerLocationIngestionService {
             throw e;
 
         } finally {
-            lockService.release(SOURCE_CODE, LOCKED_BY);
+            lockService.release(SOURCE_CODE, lockedBy);
         }
     }
 
     private static ErrorCategory classify(Throwable e) {
-        if (e instanceof IngestionLockException) return ErrorCategory.LOCK_ERROR;
-        if (e instanceof KrogerApiException) return ErrorCategory.API_ERROR;
-        if (e instanceof DataAccessException) return ErrorCategory.DB_ERROR;
-        if (e instanceof IllegalArgumentException) return ErrorCategory.VALIDATION_ERROR;
+        if (e instanceof IngestionLockException)     return ErrorCategory.LOCK_ERROR;
+        if (e instanceof KrogerApiException)         return ErrorCategory.API_ERROR;
+        if (e instanceof DataAccessException)        return ErrorCategory.DB_ERROR;
+        if (e instanceof IllegalArgumentException)   return ErrorCategory.VALIDATION_ERROR;
         return ErrorCategory.UNCLASSIFIED;
     }
 }
