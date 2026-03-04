@@ -1,115 +1,109 @@
 # Foo Data Platform (FDP)
 
-A grocery price intelligence backend that ingests multi-source retail pricing data, stores immutable time series price snapshots, and supports state and national analytics.
+---
 
-## Architecture
-
-Designed as a modular monolith with microservice extraction in mind each data source is fully isolated in its own package and can be extracted into a standalone Spring Boot service with minimal refactoring.
+## System Flow
 
 ```
-fdp/
-├── core/               # Shared platform infrastructure (locks, runs, quota, raw payloads)
-├── grocery/            # Domain model (locations, products, prices)
-└── sources/
-    └── kroger/         # Kroger API adapter (auth, client, ingestion, web)
+External APIs
+    --> API Clients
+        --> Source Adapters
+            --> Canonical Models
+                --> PostgreSQL Database
+                    --> Query Services
+                        --> Applications
 ```
 
-**Key design decisions:**
-- Append-only price_observation table with `ON CONFLICT DO NOTHING batch inserts for idempotent ingestion
-- Table-based distributed lock (fdp_core.ingestion_lock) prevents concurrent ingestion runs per source
-- Every API response, success or failure, is archived to fdp_core.raw_payload before any exception is raised
+> This design ensures that new APIs can be added without modifying ingestion infrastructure.
 
-## Tech Stack
+---
 
-| Layer | Technology |
-|---|---|
-| Runtime | Java 21 |
-| Framework | Spring Boot 4.0 |
-| Persistence | PostgreSQL 16, Spring Data JPA, JdbcTemplate |
-| Schema migrations | Flyway |
-| HTTP client | Spring RestClient |
-| Serialization | Jackson 3 |
-| Containerization | Docker / Docker Compose |
+## Example Data Model
 
-## Prerequisites
+### Price Observation
 
-- Docker and Docker Compose
-- A .env file in the project root (see below)
+| Field       | Description                       |
+|-------------|-----------------------------------|
+| product_id  | Canonical product identifier      |
+| location_id | Store or geographic location      |
+| price       | Observed price                    |
+| observed_at | Timestamp of observation          |
+| source      | API provider                      |
 
-## Environment Setup
+> Each observation is immutable, allowing historical price analysis and trend detection.
 
-Create a .env file in the project root based on .env.example
+---
 
-## Running the Application
+## Example API Responses
 
-```bash
-docker compose up -d --build
+### Product Search
+
+```
+GET /api/products/search?q=milk
 ```
 
-Flyway migrations run automatically at startup. The backend is available at http://localhost:8080.
-
-```bash
-# View backend logs
-docker compose logs -f backend
+```json
+{
+  "productId": "12345",
+  "name": "Whole Milk",
+  "brand": "Example Brand",
+  "category": "Dairy"
+}
 ```
 
-## API Endpoints
+### Price History
 
-### Token Management
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/kroger/token/status` | Check current OAuth token state |
-| `POST` | `/kroger/token/refresh` | Force token refresh |
-
-### Store Locations
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/kroger/locations` | All ingested Kroger locations |
-| `GET` | `/kroger/locations/{locationId}` | Single location by Kroger location ID |
-
-### Ingestion Triggers
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/kroger/ingestion/locations` | Trigger location ingestion by zip code(s) |
-| `POST` | `/kroger/ingestion/products` | Trigger product + price ingestion |
-
-**Example — trigger location ingestion:**
-```bash
-curl -X POST http://localhost:8080/kroger/ingestion/locations \
-  -H "Content-Type: application/json" \
-  -d '{"zipCodes": ["77001", "77002"]}'
+```
+GET /api/prices/{productId}
 ```
 
-**Example — trigger product ingestion:**
-```bash
-curl -X POST http://localhost:8080/kroger/ingestion/products \
-  -H "Content-Type: application/json" \
-  -d '{"locationIds": ["70100277"], "searchTerms": ["milk", "bread", "eggs"]}'
+```json
+{
+  "productId": "12345",
+  "observations": [
+    { "price": 3.49, "observedAt": "2026-01-01" },
+    { "price": 3.29, "observedAt": "2026-02-01" }
+  ]
+}
 ```
 
-## Database Schema
+---
 
-Managed exclusively by Flyway. Never modify tables manually.
+## Engineering Challenges Solved
 
-| Schema | Purpose |
-|---|---|
-| `fdp_core` | Source systems, ingestion runs, locks, quota tracking, raw payloads |
-| `fdp_grocery` | Store locations, products, price observations |
-| `fdp_public_safety` | Reserved for future non-grocery datasets |
+### Integrating Inconsistent APIs
+External APIs return different schemas and authentication mechanisms. The platform uses adapters and canonical DTOs to normalize all sources.
 
-Migrations live in `backend/src/main/resources/db/migration/`.
+### Preventing Duplicate Data
+Idempotent ingestion ensures repeated API pulls do not create duplicate records.
+
+### Handling Rate Limits
+Quota tracking and ingestion scheduling prevent API rate limit violations.
+
+### Observability and Debugging
+All API responses are archived as raw payloads, enabling replay and debugging of ingestion runs.
+
+---
 
 ## Running Tests
 
-```bash
 docker compose run --rm test
-```
 
-Tests are unit and web-layer slice tests only. No database or external services required.
+---
 
-## Adding a New Data Source
+## Future Development
 
-1. Create `sources/<sourcename>/` following the Kroger package structure
-2. Add a seed row to `fdp_core.source_system` via a new Flyway migration
-3. Register the new `@ConfigurationProperties` class in `FdpApplication.java`
-4. Shared infrastructure (`IngestionRunService`, `IngestionLockService`, `RawPayloadService`) is reused as-is
+Planned improvements include:
+
+- Additional API integrations
+- Event-driven architecture using Kafka
+- Independent ingestion and query services
+- Advanced analytics and visualization
+- Mobile and web client applications
+
+---
+
+## Author
+
+**Darian Rodriguez**
+Software Engineer | Data Platform Developer
