@@ -1,5 +1,7 @@
 .env
+.env.local
 
 plans.txt
 
 node_modules/
+target/
