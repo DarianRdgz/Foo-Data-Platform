@@ -188,7 +188,7 @@ public class KrogerProductIngestionService {
                 String summary = String.format(
                         "Products: %d processed, %d/%d price observations inserted (remainder duplicates)",
                         productCount, inserted, priceRows.size());
-                runService.finishSuccess(runId, summary);
+                runService.finishSuccess(runId, inserted, summary);
 
                 log.info("Ingestion completed: {}", summary);
                 return summary;

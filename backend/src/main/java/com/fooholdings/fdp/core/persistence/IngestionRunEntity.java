@@ -51,6 +51,12 @@ public class IngestionRunEntity {
     @Column(name = "locked_by")
     private String lockedBy;
 
+    @Column(name = "records_written", nullable = false)
+    private int recordsWritten;
+
+    @Column(name = "error_detail")
+    private String errorDetail;
+
     // Getters / Setters
 
     public UUID getId() { return id; }
@@ -79,4 +85,10 @@ public class IngestionRunEntity {
 
     public String getLockedBy() { return lockedBy; }
     public void setLockedBy(String lockedBy) { this.lockedBy = lockedBy; }
+
+    public int getRecordsWritten() { return recordsWritten; }
+    public void setRecordsWritten(int recordsWritten) { this.recordsWritten = recordsWritten; }
+
+    public String getErrorDetail() { return errorDetail; }
+    public void setErrorDetail(String errorDetail) { this.errorDetail = errorDetail; }
 }

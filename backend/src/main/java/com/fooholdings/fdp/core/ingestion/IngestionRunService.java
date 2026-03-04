@@ -1,16 +1,19 @@
 package com.fooholdings.fdp.core.ingestion;
 
-import com.fooholdings.fdp.core.persistence.IngestionRunEntity;
-import com.fooholdings.fdp.core.persistence.IngestionRunRepository;
-import com.fooholdings.fdp.core.source.SourceSystemService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
-import tools.jackson.databind.ObjectMapper;
-
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+import com.fooholdings.fdp.core.persistence.IngestionRunEntity;
+import com.fooholdings.fdp.core.persistence.IngestionRunRepository;
+import com.fooholdings.fdp.core.source.SourceSystemService;
+
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Manages the lifecycle of fdp_core.ingestion_run records.
@@ -30,6 +33,7 @@ public class IngestionRunService {
 
     private static final Logger log = LoggerFactory.getLogger(IngestionRunService.class);
     private static final int MAX_MESSAGE_LENGTH = 500;
+    private static final int ERROR_DETAIL_MAX_CHARS = 8000;
 
     private final IngestionRunRepository repo;
     private final SourceSystemService sourceSystemService;
@@ -70,14 +74,15 @@ public class IngestionRunService {
     }
 
     //Marks an existing run as SUCCESS and logs the result summary.
-    public void finishSuccess(UUID runId, String message) {
+    public void finishSuccess(UUID runId, int recordsWritten, String message) {
         IngestionRunEntity run = repo.findById(runId)
                 .orElseThrow(() -> new IllegalStateException("Run not found: " + runId));
+
         run.setFinishedAt(Instant.now());
         run.setStatus("SUCCESS");
-        run.setMessage(truncate(message));
+        run.setRecordsWritten(Math.max(recordsWritten, 0));
+        run.setMessage(truncate(message)); // keep your existing truncate for message
         repo.save(run);
-        log.info("[run:{}] SUCCESS — {}", runId, message);
     }
 
     //Marks an existing run as FAILED so the run is never left in RUNNING state indefinitely.
@@ -89,6 +94,10 @@ public class IngestionRunService {
             run.setStatus("FAILED");
             run.setMessage(truncate(ex.getClass().getSimpleName() + ": " +
                     (ex.getMessage() != null ? ex.getMessage() : "(no message)")));
+
+            String raw = stackTraceToString(ex);
+            run.setErrorDetail(truncateTo(raw, ERROR_DETAIL_MAX_CHARS));
+
             repo.save(run);
             log.error("[run:{}] FAILED — {}: {}", runId, ex.getClass().getSimpleName(), ex.getMessage());
         } catch (Exception saveEx) {
@@ -103,7 +112,7 @@ public class IngestionRunService {
         if (scope == null || scope.isEmpty()) return null;
         try {
             return mapper.writeValueAsString(scope);
-        } catch (Exception e) {
+        } catch (JacksonException e) {
             log.warn("Could not serialize ingestion scope to JSON: {}", e.getMessage());
             return "{\"_error\":\"scope_serialization_failed\"}";
         }
@@ -112,5 +121,18 @@ public class IngestionRunService {
     private static String truncate(String s) {
         if (s == null) return null;
         return s.length() > MAX_MESSAGE_LENGTH ? s.substring(0, MAX_MESSAGE_LENGTH) : s;
+    }
+
+    private static String truncateTo(String s, int max) {
+        if (s == null) return null;
+        if (s.length() <= max) return s;
+        return s.substring(0, max) + "\n... (truncated)";
+    }
+
+    private static String stackTraceToString(Throwable ex) {
+        java.io.StringWriter sw = new java.io.StringWriter();
+        java.io.PrintWriter pw = new java.io.PrintWriter(sw);
+        ex.printStackTrace(pw);
+        return sw.toString();
     }
 }

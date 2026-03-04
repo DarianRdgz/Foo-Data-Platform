@@ -136,7 +136,7 @@ public class KrogerLocationIngestionService {
 
                 String summary = "Processed " + total + " locations across " +
                         zipCodes.size() + " zip(s). Upserted: " + upserted;
-                runService.finishSuccess(runId, summary);
+                runService.finishSuccess(runId, upserted, summary);
                 log.info("Ingestion completed: {}", summary);
                 return summary;
             }

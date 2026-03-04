@@ -21,7 +21,9 @@ import com.fooholdings.fdp.sources.kroger.config.KrogerProperties;
         KrogerProperties.class,
         Where2MoveStaplesProperties.class,
         FdpSchedulerProperties.class,
-        AdminSecurityProperties.class
+        AdminSecurityProperties.class,
+        com.fooholdings.fdp.admin.security.AdminSecurityProperties.class,
+        com.fooholdings.fdp.admin.ingestion.FdpQuotaProperties.class
 })
 public class FdpApplication {
 
