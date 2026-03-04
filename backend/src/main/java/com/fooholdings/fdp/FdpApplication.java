@@ -5,6 +5,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
+import com.fooholdings.fdp.admin.security.AdminSecurityProperties;
 import com.fooholdings.fdp.api.service.Where2MoveStaplesProperties;
 import com.fooholdings.fdp.core.scheduler.FdpSchedulerProperties;
 import com.fooholdings.fdp.sources.kroger.config.KrogerProperties;
@@ -19,7 +20,8 @@ import com.fooholdings.fdp.sources.kroger.config.KrogerProperties;
 @EnableConfigurationProperties({
         KrogerProperties.class,
         Where2MoveStaplesProperties.class,
-        FdpSchedulerProperties.class
+        FdpSchedulerProperties.class,
+        AdminSecurityProperties.class
 })
 public class FdpApplication {
 
