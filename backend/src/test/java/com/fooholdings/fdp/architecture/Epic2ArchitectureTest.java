@@ -19,4 +19,17 @@ class Epic2ArchitectureTest {
                 )
                 .check(classes);
     }
+
+    @Test
+    void ingestionServicesMustNotDependOnKrogerClientPackage() {
+        var classes = new ClassFileImporter()
+                .importPackages("com.fooholdings.fdp");
+
+        noClasses()
+                .that().resideInAPackage("com.fooholdings.fdp.sources..ingestion..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "com.fooholdings.fdp.sources.kroger.client.."
+                )
+                .check(classes);
+    }
 }

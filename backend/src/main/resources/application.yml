@@ -54,3 +54,13 @@ fdp:
           - "bread"
           - "rice"
           - "chicken"
+  geo:
+      # Sprint 5: gate early MVP ingestion/queries to specific levels if needed
+      levels:
+        enabled: [national, state, metro, county, city, zip]
+
+      # One-time bootstrap of geo_areas from CSVs mounted into the container.
+      # Turn on for a single run, then turn back off.
+      seeding:
+        enabled: ${FDP_GEO_SEEDING_ENABLED:false}
+        seedDir: ${FDP_GEO_SEED_DIR:/opt/fdp/seed}

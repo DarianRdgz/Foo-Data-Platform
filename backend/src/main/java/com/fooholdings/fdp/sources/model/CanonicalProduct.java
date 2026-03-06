@@ -8,6 +8,7 @@ public record CanonicalProduct(
         String upc,
         String name,
         String brand,
+        String[] categories,
         String productPageUri,
         String rawCategoryJson,
         String rawFlagsJson

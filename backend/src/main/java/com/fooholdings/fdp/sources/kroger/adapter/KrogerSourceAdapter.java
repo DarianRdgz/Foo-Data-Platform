@@ -25,7 +25,7 @@ import com.fooholdings.fdp.sources.model.ProductQuery;
 import com.fooholdings.fdp.sources.model.SourceType;
 
 /**
- * 
+ *
  * Responsibilities:
  * - Call Kroger endpoints via KrogerApiClient
  * - Map Kroger DTOs -> Canonical DTOs
@@ -50,14 +50,10 @@ public class KrogerSourceAdapter implements GrocerySourceAdapter {
 
     @Override
     public List<CanonicalLocation> fetchLocations(LocationQuery query) {
-        if (query == null) {
-            return List.of();
-        }
+        if (query == null) return List.of();
 
         List<String> zipCodes = query.zipCodes();
-        if (zipCodes == null || zipCodes.isEmpty()) {
-            return List.of();
-        }
+        if (zipCodes == null || zipCodes.isEmpty()) return List.of();
 
         UUID runId = query.ingestionRunId();
         List<CanonicalLocation> out = new ArrayList<>();
@@ -94,9 +90,7 @@ public class KrogerSourceAdapter implements GrocerySourceAdapter {
 
     @Override
     public List<CanonicalProductPrice> fetchProducts(ProductQuery query) {
-        if (query == null) {
-            return List.of();
-        }
+        if (query == null) return List.of();
 
         List<String> locationIds = query.locationIds();
         List<String> searchTerms = query.searchTerms();
@@ -122,10 +116,11 @@ public class KrogerSourceAdapter implements GrocerySourceAdapter {
                             product.getProductId(),
                             product.getUpc(),
                             product.getDescription(),
-                            null, // brand not present in current Kroger DTO
-                            null, // product page URI not present
-                            null, // categories not present
-                            null  // flags not present
+                            product.getBrand(),
+                            toCategoriesArray(product.getCategories()),
+                            null, // product page URI not present in current Kroger DTO
+                            null, // raw category json not captured
+                            null  // raw flags json not captured
                     );
 
                     Price price = extractFirstPrice(product);
@@ -133,10 +128,10 @@ public class KrogerSourceAdapter implements GrocerySourceAdapter {
 
                     BigDecimal regular = price.getRegular() != null ? BigDecimal.valueOf(price.getRegular()) : null;
                     BigDecimal promo = price.getPromo() != null ? BigDecimal.valueOf(price.getPromo()) : null;
-                    BigDecimal effective = promo != null ? promo : regular;
+                    BigDecimal effective = (promo != null) ? promo : regular;
                     if (effective == null) continue;
 
-                    Boolean onSale = promo != null && regular != null && promo.compareTo(regular) < 0;
+                    Boolean onSale = (promo != null && regular != null && promo.compareTo(regular) < 0);
 
                     CanonicalPriceObservation obs = new CanonicalPriceObservation(
                             observedAt,
@@ -159,5 +154,15 @@ public class KrogerSourceAdapter implements GrocerySourceAdapter {
         if (product.getItems() == null || product.getItems().isEmpty()) return null;
         Item first = product.getItems().get(0);
         return first != null ? first.getPrice() : null;
+    }
+
+    private static String[] toCategoriesArray(java.util.List<String> categories) {
+        if (categories == null || categories.isEmpty()) return null;
+        return categories.stream()
+                .filter(java.util.Objects::nonNull)
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .distinct()
+                .toArray(String[]::new);
     }
 }

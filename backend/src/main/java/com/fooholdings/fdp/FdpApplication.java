@@ -9,6 +9,7 @@ import com.fooholdings.fdp.admin.security.AdminSecurityProperties;
 import com.fooholdings.fdp.api.service.Where2MoveStaplesProperties;
 import com.fooholdings.fdp.core.scheduler.FdpSchedulerProperties;
 import com.fooholdings.fdp.sources.kroger.config.KrogerProperties;
+import com.fooholdings.fdp.geo.config.GeoProperties;
 
 /**
  * Entry point for Foo Data Platform.
@@ -23,7 +24,8 @@ import com.fooholdings.fdp.sources.kroger.config.KrogerProperties;
         FdpSchedulerProperties.class,
         AdminSecurityProperties.class,
         com.fooholdings.fdp.admin.security.AdminSecurityProperties.class,
-        com.fooholdings.fdp.admin.ingestion.FdpQuotaProperties.class
+        com.fooholdings.fdp.admin.ingestion.FdpQuotaProperties.class,
+        GeoProperties.class
 })
 public class FdpApplication {
 

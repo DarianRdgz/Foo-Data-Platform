@@ -1,0 +1,107 @@
+package com.fooholdings.fdp.geo.repo;
+
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.Optional;
+import java.util.UUID;
+
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
+import org.springframework.stereotype.Repository;
+
+/**
+ * Minimal JDBC repository for fdp_geo.geo_areas.
+ */
+@Repository
+public class GeoAreaJdbcRepository {
+
+    private final JdbcTemplate jdbc;
+
+    public GeoAreaJdbcRepository(JdbcTemplate jdbc) {
+        this.jdbc = jdbc;
+    }
+
+    public Optional<UUID> findNationalGeoId() {
+        return jdbc.query(
+                "select geo_id from fdp_geo.geo_areas where geo_level = 'national' limit 1",
+                rs -> rs.next() ? Optional.of(UUID.fromString(rs.getString(1))) : Optional.empty());
+    }
+
+    public Optional<UUID> findStateGeoIdByFips(String stateFips2) {
+        return jdbc.query(
+                "select geo_id from fdp_geo.geo_areas where geo_level = 'state' and fips_code = ?",
+                rs -> rs.next() ? Optional.of(UUID.fromString(rs.getString(1))) : Optional.empty(),
+                stateFips2);
+    }
+
+    public Optional<UUID> findCountyGeoIdByFips(String countyFips5) {
+        return jdbc.query(
+                "select geo_id from fdp_geo.geo_areas where geo_level = 'county' and fips_code = ?",
+                rs -> rs.next() ? Optional.of(UUID.fromString(rs.getString(1))) : Optional.empty(),
+                countyFips5);
+    }
+
+    public UUID upsertGeoArea(
+            String geoLevel,
+            String fipsCode,
+            String cbsaCode,
+            String zipCode,
+            String name,
+            UUID parentGeoId,
+            String displayLabel
+    ) {
+        // Idempotent upsert strategy:
+        //  1) Try insert.
+        //  2) If insert doesn't return a row (conflict), lookup by the natural key for the level.
+        //
+        // We intentionally keep this logic in Java because Postgres can't express a single ON CONFLICT
+        // target that depends on which natural key (fips/cbsa/zip) is populated.
+        UUID inserted = jdbc.query(
+                """
+                insert into fdp_geo.geo_areas (geo_level, fips_code, cbsa_code, zip_code, name, parent_geo_id, display_label)
+                values (?::fdp_geo.geo_level, ?, ?, ?, ?, ?, ?)
+                on conflict do nothing
+                returning geo_id
+                """,
+                rs -> rs.next() ? UUID.fromString(rs.getString("geo_id")) : null,
+                geoLevel, fipsCode, cbsaCode, zipCode, name, parentGeoId, displayLabel
+        );
+
+        if (inserted != null) {
+            return inserted;
+        }
+
+        // Conflict path: lookup by the best available key.
+        if (zipCode != null && !zipCode.isBlank()) {
+            return jdbc.queryForObject(
+                    "select geo_id from fdp_geo.geo_areas where geo_level = ?::fdp_geo.geo_level and zip_code = ?",
+                    new UuidMapper(), geoLevel, zipCode
+            );
+        }
+        if (cbsaCode != null && !cbsaCode.isBlank()) {
+            return jdbc.queryForObject(
+                    "select geo_id from fdp_geo.geo_areas where geo_level = ?::fdp_geo.geo_level and cbsa_code = ?",
+                    new UuidMapper(), geoLevel, cbsaCode
+            );
+        }
+        if (fipsCode != null && !fipsCode.isBlank()) {
+            return jdbc.queryForObject(
+                    "select geo_id from fdp_geo.geo_areas where geo_level = ?::fdp_geo.geo_level and fips_code = ?",
+                    new UuidMapper(), geoLevel, fipsCode
+            );
+        }
+
+        // Last resort: name + parent.
+        return jdbc.queryForObject(
+                "select geo_id from fdp_geo.geo_areas where geo_level = ?::fdp_geo.geo_level and name = ? and parent_geo_id is not distinct from ?",
+                new UuidMapper(), geoLevel, name, parentGeoId
+        );
+    }
+
+    private static final class UuidMapper implements RowMapper<UUID> {
+        @Override
+        public UUID mapRow(ResultSet rs, int rowNum) throws SQLException {
+            return UUID.fromString(rs.getString(1));
+        }
+    }
+}

@@ -30,4 +30,12 @@ public class TrendApiController {
     ) {
         return service.getProductTrend(productId, period, zipCode, source);
     }
+
+    @GetMapping("/regional")
+    public TrendResponse regionalTrend(
+            @RequestParam String stateCode,
+            @RequestParam UUID productId
+    ) {
+        return service.getRegionalTrend(stateCode, productId);
+    }
 }

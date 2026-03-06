@@ -1,8 +1,6 @@
 package com.fooholdings.fdp.sources.kroger.ingestion;
 
-import java.math.BigDecimal;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -24,28 +22,16 @@ import com.fooholdings.fdp.grocery.location.StoreLocationRepository;
 import com.fooholdings.fdp.grocery.price.PriceObservationJdbcRepository;
 import com.fooholdings.fdp.grocery.price.PriceObservationJdbcRepository.PriceObservationRow;
 import com.fooholdings.fdp.grocery.product.SourceProductJdbcRepository;
-import com.fooholdings.fdp.sources.kroger.client.KrogerApiClient;
-import com.fooholdings.fdp.sources.kroger.client.KrogerApiException;
-import com.fooholdings.fdp.sources.kroger.dto.products.KrogerProductsResponse;
-import com.fooholdings.fdp.sources.kroger.dto.products.KrogerProductsResponse.Item;
-import com.fooholdings.fdp.sources.kroger.dto.products.KrogerProductsResponse.Price;
-import com.fooholdings.fdp.sources.kroger.dto.products.KrogerProductsResponse.Product;
+import com.fooholdings.fdp.sources.adapter.GrocerySourceAdapter;
+import com.fooholdings.fdp.sources.adapter.GrocerySourceAdapterRegistry;
+import com.fooholdings.fdp.sources.model.CanonicalPriceObservation;
+import com.fooholdings.fdp.sources.model.CanonicalProduct;
+import com.fooholdings.fdp.sources.model.CanonicalProductPrice;
+import com.fooholdings.fdp.sources.model.ProductQuery;
+import com.fooholdings.fdp.sources.model.SourceType;
 
 /**
  * Orchestrates the full lifecycle of a Kroger product + price ingestion run.
- *
- * Flow:
- *   1. Acquire distributed lock (separate lock key from location ingestion)
- *   2. Start ingestion_run record
- *   3. For each (locationId, searchTerm): call /products, upsert source_product, collect price rows
- *   4. Batch-insert price observations with ON CONFLICT DO NOTHING
- *   5. Mark run SUCCESS / FAILED
- *   6. Release lock (always)
- *
- * Warning:
- *   Location and product ingestion intentionally cannot run concurrently for the same source
- *
- * Price observations are collected in memory then batch-inserted at the end.
  */
 @Service
 public class KrogerProductIngestionService {
@@ -54,9 +40,8 @@ public class KrogerProductIngestionService {
     private static final String SOURCE_CODE = "KROGER";
     private static final String DEFAULT_LOCKED_BY = "fdp-backend";
     private static final Duration LOCK_TTL = Duration.ofMinutes(30);
-    private static final String CURRENCY_CODE = "USD";
 
-    private final KrogerApiClient apiClient;
+    private final GrocerySourceAdapter adapter;
     private final SourceProductJdbcRepository sourceProductRepo;
     private final PriceObservationJdbcRepository priceObsRepo;
     private final StoreLocationRepository locationRepo;
@@ -64,14 +49,14 @@ public class KrogerProductIngestionService {
     private final IngestionLockService lockService;
     private final SourceSystemService sourceSystemService;
 
-    public KrogerProductIngestionService(KrogerApiClient apiClient,
+    public KrogerProductIngestionService(GrocerySourceAdapterRegistry adapterRegistry,
                                          SourceProductJdbcRepository sourceProductRepo,
                                          PriceObservationJdbcRepository priceObsRepo,
                                          StoreLocationRepository locationRepo,
                                          IngestionRunService runService,
                                          IngestionLockService lockService,
                                          SourceSystemService sourceSystemService) {
-        this.apiClient = apiClient;
+        this.adapter = adapterRegistry.getRequired(SourceType.KROGER);
         this.sourceProductRepo = sourceProductRepo;
         this.priceObsRepo = priceObsRepo;
         this.locationRepo = locationRepo;
@@ -80,28 +65,10 @@ public class KrogerProductIngestionService {
         this.sourceSystemService = sourceSystemService;
     }
 
-    /**
-     * Manual trigger entry point. Uses the default lockedBy value.
-     *
-     * @param locationIds  Kroger location IDs from store_location
-     * @param searchTerms  product search terms to query
-     * @return summary message from the completed run
-     * @throws IngestionLockException if a run is already in progress
-     */
     public String ingest(List<String> locationIds, List<String> searchTerms) {
         return ingest(locationIds, searchTerms, DEFAULT_LOCKED_BY);
     }
 
-    /**
-     * Full entry point — accepts a caller identity written to ingestion_run.locked_by.
-     * Scheduled jobs pass lockedBy="scheduler"; manual triggers use the no-arg overload.
-     *
-     * @param locationIds  Kroger location IDs from store_location
-     * @param searchTerms  product search terms to query
-     * @param lockedBy     identity of the caller, recorded in ingestion_run
-     * @return summary message from the completed run
-     * @throws IngestionLockException if a run is already in progress
-     */
     public String ingest(List<String> locationIds, List<String> searchTerms, String lockedBy) {
         if (!lockService.tryAcquire(SOURCE_CODE, lockedBy, LOCK_TTL)) {
             throw new IngestionLockException("Kroger product ingestion is already running. Try again later.");
@@ -118,78 +85,78 @@ public class KrogerProductIngestionService {
             try (@SuppressWarnings("unused") var ctx = IngestionMdc.withRun(runId, SOURCE_CODE)) {
 
                 short sourceSystemId = sourceSystemService.getRequiredIdByCode(SOURCE_CODE);
+
+                log.info("Ingestion started: products (locations={}, terms={})",
+                        (locationIds == null ? 0 : locationIds.size()),
+                        (searchTerms == null ? 0 : searchTerms.size()));
+
+                ProductQuery query = new ProductQuery(locationIds, searchTerms, runId);
+                List<CanonicalProductPrice> results = adapter.fetchProducts(query);
+
                 List<PriceObservationRow> priceRows = new ArrayList<>();
                 int productCount = 0;
-                Instant observedAt = Instant.now();
 
-                log.info("Ingestion started: products (locations={}, terms={})", locationIds.size(), searchTerms.size());
+                for (CanonicalProductPrice cpp : results) {
+                    if (cpp == null) continue;
 
-                for (String locationId : locationIds) {
+                    String sourceLocationId = cpp.sourceLocationId();
                     var locationEntity = locationRepo
-                            .findBySourceSystemIdAndSourceLocationId(sourceSystemId, locationId)
+                            .findBySourceSystemIdAndSourceLocationId(sourceSystemId, sourceLocationId)
                             .orElse(null);
 
                     if (locationEntity == null) {
                         try (@SuppressWarnings("unused") var cat = ErrorCategoryMdc.with(ErrorCategory.VALIDATION_ERROR)) {
-                            log.warn("Skipping locationId={} — not found in store_location. Run location ingestion first.", locationId);
+                            log.warn("Skipping sourceLocationId={} — not found in store_location. Run location ingestion first.",
+                                    sourceLocationId);
                         }
                         continue;
                     }
 
                     UUID storeLocationPk = locationEntity.getId();
 
-                    for (String term : searchTerms) {
-                        log.debug("Fetching products — location={}, term={}", locationId, term);
+                    CanonicalProduct p = cpp.product();
+                    if (p == null) continue;
+                    productCount++;
 
-                        KrogerProductsResponse response = apiClient.getProducts(locationId, term, runId);
-                        List<Product> products = response.getData();
-                        if (products == null || products.isEmpty()) continue;
+                    UUID sourceProductPk = sourceProductRepo.upsert(
+                            UUID.randomUUID(),
+                            sourceSystemId,
+                            p.sourceProductId(),
+                            p.upc(),
+                            p.name(),
+                            p.brand(),
+                            p.categories(),
+                            p.productPageUri(),
+                            p.rawCategoryJson(),
+                            p.rawFlagsJson()
+                    );
 
-                        for (Product product : products) {
-                            productCount++;
+                    CanonicalPriceObservation obs = cpp.priceObservation();
+                    if (obs == null || obs.price() == null) continue;
 
-                            UUID sourceProductPk = sourceProductRepo.upsert(
-                                UUID.randomUUID(),
-                                sourceSystemId,
-                                product.getProductId(),
-                                product.getUpc(),
-                                product.getDescription(),  // name/description
-                                product.getBrand(),        // brand
-                                toCategoriesArray(product.getCategories()), // categories (String[])
-                                null,                      // product_page_uri
-                                null,                      // raw_category_json 
-                                null                       // raw_flags_json 
-                        );
-
-                            Price price = extractFirstPrice(product);
-                            if (price == null) continue;
-
-                            BigDecimal regular = price.getRegular() != null ? BigDecimal.valueOf(price.getRegular()) : null;
-                            BigDecimal promo = price.getPromo() != null ? BigDecimal.valueOf(price.getPromo()) : null;
-
-                            priceRows.add(new PriceObservationRow(
-                                    sourceSystemId,
-                                    storeLocationPk,
-                                    sourceProductPk,
-                                    observedAt,
-                                    CURRENCY_CODE,
-                                    promo != null ? promo : regular,
-                                    regular,
-                                    promo,
-                                    promo != null && regular != null && promo.compareTo(regular) < 0,
-                                    runId,
-                                    null
-                            ));
-                        }
-                    }
+                    priceRows.add(new PriceObservationRow(
+                            sourceSystemId,
+                            storeLocationPk,
+                            sourceProductPk,
+                            obs.observedAt(),
+                            obs.currencyCode(),
+                            obs.price(),
+                            obs.regularPrice(),
+                            obs.promoPrice(),
+                            Boolean.TRUE.equals(obs.isOnSale()),
+                            runId,
+                            null
+                    ));
                 }
 
                 int inserted = priceObsRepo.batchInsert(priceRows);
+
                 String summary = String.format(
                         "Products: %d processed, %d/%d price observations inserted (remainder duplicates)",
-                        productCount, inserted, priceRows.size());
-                runService.finishSuccess(runId, inserted, summary);
+                        productCount, inserted, priceRows.size()
+                );
 
+                runService.finishSuccess(runId, inserted, summary);
                 log.info("Ingestion completed: {}", summary);
                 return summary;
             }
@@ -214,25 +181,8 @@ public class KrogerProductIngestionService {
 
     private static ErrorCategory classify(Throwable e) {
         if (e instanceof IngestionLockException) return ErrorCategory.LOCK_ERROR;
-        if (e instanceof KrogerApiException) return ErrorCategory.API_ERROR;
         if (e instanceof DataAccessException) return ErrorCategory.DB_ERROR;
         if (e instanceof IllegalArgumentException) return ErrorCategory.VALIDATION_ERROR;
         return ErrorCategory.UNCLASSIFIED;
-    }
-
-    private static Price extractFirstPrice(Product product) {
-        if (product.getItems() == null || product.getItems().isEmpty()) return null;
-        Item first = product.getItems().get(0);
-        return first != null ? first.getPrice() : null;
-    }
-
-    private static String[] toCategoriesArray(java.util.List<String> categories) {
-        if (categories == null || categories.isEmpty()) return null;
-        return categories.stream()
-                .filter(java.util.Objects::nonNull)
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .distinct()
-                .toArray(String[]::new);
     }
 }

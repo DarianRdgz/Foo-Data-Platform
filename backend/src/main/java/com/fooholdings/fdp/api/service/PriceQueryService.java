@@ -49,6 +49,65 @@ public class PriceQueryService {
     }
 
     // -----------------------------
+    // Regional trend buckets (state aggregate)
+    // -----------------------------
+    public TrendResponse getRegionalTrend(String stateCode, UUID productId) {
+
+        String sc = blankToNull(stateCode);
+        if (sc == null || sc.length() != 2) {
+            throw new ResponseStatusException(BAD_REQUEST, "stateCode must be a 2-letter code (e.g., TX)");
+        }
+        sc = sc.toUpperCase(Locale.ROOT);
+
+        // Spec does not include period param; default to 30d like other trend endpoints.
+        Duration d = Duration.ofDays(30);
+        Instant toExclusive = Instant.now();
+        Instant fromInclusive = toExclusive.minus(d);
+        Range range = normalizeRange(fromInclusive, toExclusive, null);
+
+        String sql = """
+            SELECT
+                date_trunc('day', po.observed_at) AS bucket_start,
+                date_trunc('day', po.observed_at) + interval '1 day' AS bucket_end,
+                MIN(po.price) AS min_price,
+                MAX(po.price) AS max_price,
+                AVG(po.price) AS avg_price,
+                COUNT(*) AS sample_size
+            FROM fdp_grocery.price_observation po
+            JOIN fdp_grocery.store_location sl
+            ON sl.id = po.store_location_id
+            WHERE sl.state_code = :stateCode
+            AND po.source_product_pk = :productId
+            AND po.observed_at >= :fromTs
+            AND po.observed_at <  :toTs
+            GROUP BY 1,2
+            ORDER BY 1 ASC
+            """;
+
+        MapSqlParameterSource p = new MapSqlParameterSource()
+                .addValue("stateCode", sc)
+                .addValue("productId", productId)
+                .addValue("fromTs", Timestamp.from(range.fromInclusive()))
+                .addValue("toTs", Timestamp.from(range.toExclusive()));
+
+        List<TrendResponse.TrendPoint> points = jdbc.query(sql, p, (rs, rowNum) -> {
+            BigDecimal avg = rs.getBigDecimal("avg_price");
+            if (avg != null) avg = avg.setScale(2, RoundingMode.HALF_UP);
+
+            return new TrendResponse.TrendPoint(
+                    rs.getTimestamp("bucket_start").toInstant(),
+                    rs.getTimestamp("bucket_end").toInstant(),
+                    rs.getBigDecimal("min_price"),
+                    rs.getBigDecimal("max_price"),
+                    avg,
+                    rs.getLong("sample_size")
+            );
+        });
+
+        return new TrendResponse("30d", points);
+    }
+
+    // -----------------------------
     // Product price history
     // -----------------------------
     public List<PriceResponse> getPriceHistory(UUID productId,
