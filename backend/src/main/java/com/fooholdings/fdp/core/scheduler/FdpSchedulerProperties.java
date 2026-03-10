@@ -13,32 +13,42 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  *
  */
 @ConfigurationProperties(prefix = "fdp.scheduler")
-public record FdpSchedulerProperties(Kroger kroger, Zillow zillow) {
+public record FdpSchedulerProperties(Kroger kroger, Zillow zillow, Crime crime, Fred fred) {
 
-    public record Kroger(
-            boolean enabled,
-            Locations locations,
-            Products products
-    ) {}
+        public record Kroger(
+                boolean enabled,
+                Locations locations,
+                Products products
+        ) {}
 
-    public record Locations(
-            String cron,
-            List<String> zipCodes
-    ) {}
+        public record Locations(
+                String cron,
+                List<String> zipCodes
+        ) {}
 
-    public record Products(
-            String cron,
-            List<String> locationIds,
-            List<String> searchTerms
-    ) {}
+        public record Products(
+                String cron,
+                List<String> locationIds,
+                List<String> searchTerms
+        ) {}
 
-    public record Zillow(
-            boolean enabled,
-            Job zhvi,
-            Job zori,
-            Job listings,
-            Job affordability
-    ) {}
+        public record Zillow(
+                boolean enabled,
+                Job zhvi,
+                Job zori,
+                Job listings,
+                Job affordability
+        ) {}
+
+        public record Crime(
+                boolean enabled,
+                Job cde
+        ) {}
+
+        public record Fred(
+                boolean enabled,
+                Job series
+        ) {}
 
     public record Job(String cron) {}
 }

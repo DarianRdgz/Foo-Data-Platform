@@ -104,6 +104,61 @@ public class GeoAreaJdbcRepository {
         );
     }
 
+    /**
+     * Finds a state geo_id by case-insensitive name match.
+     * Used by CdeAdapter to resolve raw state strings from FBI CSV files.
+     */
+    public Optional<UUID> findStateGeoIdByName(String stateName) {
+        return jdbc.query(
+                """
+                select geo_id
+                from fdp_geo.geo_areas
+                where geo_level = 'state'
+                and lower(name) = lower(?)
+                limit 1
+                """,
+                rs -> rs.next() ? Optional.of(UUID.fromString(rs.getString(1))) : Optional.empty(),
+                stateName
+        );
+    }
+
+    /**
+     * Generic geo lookup by level + key type + key value.
+     * Used by FredAdapter to resolve series definitions from the FRED catalog at runtime,
+     * keeping UUIDs out of configuration files.
+     *
+     * @param geoLevel    one of: national, state, county, metro, zip
+     * @param geoKeyType  one of: none, fips, cbsa, name, zip
+     * @param geoKey      the actual key value (e.g. "48" for Texas FIPS, "US" for national)
+     */
+    public Optional<UUID> findGeoId(String geoLevel, String geoKeyType, String geoKey) {
+        if (geoLevel == null || geoKeyType == null) {
+            return Optional.empty();
+        }
+        return switch (geoLevel) {
+            case "national" -> findNationalGeoId();
+            case "state"   -> switch (geoKeyType) {
+                case "fips" -> findStateGeoIdByFips(geoKey);
+                case "name" -> findStateGeoIdByName(geoKey);
+                default     -> Optional.empty();
+            };
+            case "county"  -> switch (geoKeyType) {
+                case "fips" -> findCountyGeoIdByFips(geoKey);
+                default     -> Optional.empty();
+            };
+            case "metro"   -> switch (geoKeyType) {
+                case "cbsa" -> findMetroGeoIdByCbsaCode(geoKey);
+                case "name" -> findMetroGeoIdByName(geoKey);
+                default     -> Optional.empty();
+            };
+            case "zip"     -> switch (geoKeyType) {
+                case "zip"  -> findZipGeoIdByZipCode(geoKey);
+                default     -> Optional.empty();
+            };
+            default -> Optional.empty();
+        };
+    }
+
     public UUID upsertGeoArea(
             String geoLevel,
             String fipsCode,

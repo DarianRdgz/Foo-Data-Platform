@@ -1,26 +1,24 @@
 package com.fooholdings.fdp.sources.adapter;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
-import com.fooholdings.fdp.sources.kroger.client.KrogerApiClient;
 import com.fooholdings.fdp.sources.model.SourceType;
 
-@SpringBootTest
 class GrocerySourceAdapterRegistryTest {
-
-    @Autowired
-    private GrocerySourceAdapterRegistry registry;
-
-    @MockitoBean
-    @SuppressWarnings("unused")
-    private KrogerApiClient krogerApiClient;
 
     @Test
     void resolvesKrogerAdapterBySourceType() {
+        GrocerySourceAdapter krogerAdapter = mock(GrocerySourceAdapter.class);
+        when(krogerAdapter.sourceType()).thenReturn(SourceType.KROGER);
+
+        GrocerySourceAdapterRegistry registry =
+                new GrocerySourceAdapterRegistry(List.of(krogerAdapter));
+
         GrocerySourceAdapter adapter = registry.getRequired(SourceType.KROGER);
 
         assertThat(adapter).isNotNull();

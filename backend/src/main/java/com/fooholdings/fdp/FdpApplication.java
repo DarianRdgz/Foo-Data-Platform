@@ -12,6 +12,9 @@ import com.fooholdings.fdp.core.scheduler.FdpSchedulerProperties;
 import com.fooholdings.fdp.geo.config.GeoProperties;
 import com.fooholdings.fdp.sources.kroger.config.KrogerProperties;
 import com.fooholdings.fdp.sources.zillow.config.ZillowProperties;
+import com.fooholdings.fdp.sources.cde.config.CdeProperties;
+import com.fooholdings.fdp.sources.fred.config.FredProperties;
+import com.fooholdings.fdp.admin.ingestion.FdpQuotaProperties;
 
 /**
  * Entry point for Foo Data Platform.
@@ -25,11 +28,12 @@ import com.fooholdings.fdp.sources.zillow.config.ZillowProperties;
         KrogerProperties.class,
         Where2MoveStaplesProperties.class,
         FdpSchedulerProperties.class,
-        AdminSecurityProperties.class,
-        com.fooholdings.fdp.admin.security.AdminSecurityProperties.class,
-        com.fooholdings.fdp.admin.ingestion.FdpQuotaProperties.class,
+        AdminSecurityProperties.class,          // ← only once (removed duplicate)
+        FdpQuotaProperties.class,
         GeoProperties.class,
-        ZillowProperties.class
+        ZillowProperties.class,
+        CdeProperties.class,
+        FredProperties.class
 })
 public class FdpApplication {
 

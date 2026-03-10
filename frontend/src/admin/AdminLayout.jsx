@@ -45,6 +45,7 @@ export default function AdminLayout() {
                 <NavItem to="/admin">Overview</NavItem>
                 <NavItem to="/admin/jobs">Jobs</NavItem>
                 <NavItem to="/admin/ingestion">Ingestion</NavItem>
+                <NavItem to="/admin/fred">FRED Series</NavItem>
                 <NavItem to="/admin/db">Database</NavItem>
               </nav>
 

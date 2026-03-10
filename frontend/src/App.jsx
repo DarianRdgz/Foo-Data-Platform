@@ -6,6 +6,7 @@ import AdminOverview from './admin/pages/AdminOverview'
 import AdminJobs from './admin/pages/AdminJobs'
 import AdminIngestion from './admin/pages/AdminIngestion'
 import AdminDb from './admin/pages/AdminDb'
+import AdminFred from './admin/pages/AdminFred'
 
 function PublicHome() {
   return (
@@ -38,6 +39,7 @@ export default function App() {
         <Route index element={<AdminOverview />} />
         <Route path="jobs" element={<AdminJobs />} />
         <Route path="ingestion" element={<AdminIngestion />} />
+        <Route path="fred" element={<AdminFred />} />
         <Route path="db" element={<AdminDb />} />
       </Route>
 

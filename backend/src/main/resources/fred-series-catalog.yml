@@ -1,0 +1,154 @@
+# FRED Series Catalog
+# Fields per entry:
+#   seriesId    — FRED series identifier
+#   category    — area_snapshot category written to DB
+#   geoLevel    — national | state | county | metro
+#   geoKeyType  — none | fips | cbsa
+#   geoKey      — the lookup key value
+#   enabled     — set false to pause a series without removing it
+
+fred:
+  series:
+
+    # ── National ─────────────────────────────────────────────────────────
+    - seriesId: UNRATE
+      category: economic.unemployment_rate
+      geoLevel: national
+      geoKeyType: none
+      geoKey: US
+      enabled: true
+
+    - seriesId: GDP
+      category: economic.gdp_nominal
+      geoLevel: national
+      geoKeyType: none
+      geoKey: US
+      enabled: true
+
+    - seriesId: MORTGAGE30US
+      category: economic.mortgage_rate_30yr
+      geoLevel: national
+      geoKeyType: none
+      geoKey: US
+      enabled: true
+
+    - seriesId: HOUST
+      category: economic.housing_starts
+      geoLevel: national
+      geoKeyType: none
+      geoKey: US
+      enabled: true
+
+    - seriesId: CPIAUCSL
+      category: economic.cpi_all_urban
+      geoLevel: national
+      geoKeyType: none
+      geoKey: US
+      enabled: true
+
+    # ── Census regions — housing starts ──────────────────────────────────
+    - seriesId: HOUSTMW
+      category: economic.housing_starts
+      geoLevel: national
+      geoKeyType: none
+      geoKey: US-MW
+      enabled: true
+
+    - seriesId: HOUSTS
+      category: economic.housing_starts
+      geoLevel: national
+      geoKeyType: none
+      geoKey: US-S
+      enabled: true
+
+    - seriesId: HOUSTNE
+      category: economic.housing_starts
+      geoLevel: national
+      geoKeyType: none
+      geoKey: US-NE
+      enabled: true
+
+    - seriesId: HOUSTW
+      category: economic.housing_starts
+      geoLevel: national
+      geoKeyType: none
+      geoKey: US-W
+      enabled: true
+
+    # ── States — unemployment (LASST*) ───────────────────────────────────
+    - seriesId: TXUR
+      category: economic.unemployment_rate
+      geoLevel: state
+      geoKeyType: fips
+      geoKey: "48"
+      enabled: true
+
+    - seriesId: CAUR
+      category: economic.unemployment_rate
+      geoLevel: state
+      geoKeyType: fips
+      geoKey: "06"
+      enabled: true
+
+    - seriesId: FLUR
+      category: economic.unemployment_rate
+      geoLevel: state
+      geoKeyType: fips
+      geoKey: "12"
+      enabled: true
+
+    - seriesId: NYUR
+      category: economic.unemployment_rate
+      geoLevel: state
+      geoKeyType: fips
+      geoKey: "36"
+      enabled: true
+
+    # NOTE: Add remaining 47 state LASST* series here.
+    # The complete list can be generated offline from FRED search:
+    #   GET https://api.stlouisfed.org/fred/series/search
+    #       ?search_text=unemployment+rate&tag_names=state;annual;nsa
+    #       &api_key=YOUR_KEY&file_type=json
+    # Each result maps to: geoLevel=state, geoKeyType=fips, geoKey=<2-digit FIPS>
+
+    # ── County unemployment (LAUCN* sample) ──────────────────────────────
+    - seriesId: THARRIS5048000000000003A
+      category: economic.unemployment_rate
+      geoLevel: county
+      geoKeyType: fips
+      geoKey: "48201"
+      enabled: true
+
+    # NOTE: Full ~3,100 county LAUCN* series should be generated offline.
+    # Shell command to bootstrap:
+    #   curl "https://api.stlouisfed.org/fred/series/search
+    #         ?search_text=unemployment&tag_names=county;annual;nsa
+    #         &api_key=YOUR_KEY&file_type=json&limit=1000&offset=0"
+    # Then map series_id → fips_code from FRED series tags.
+
+    # ── State GDP (GSP) ───────────────────────────────────────────────────
+    - seriesId: TXNGSP
+      category: economic.gdp_real
+      geoLevel: state
+      geoKeyType: fips
+      geoKey: "48"
+      enabled: true
+
+    - seriesId: CANGSP
+      category: economic.gdp_real
+      geoLevel: state
+      geoKeyType: fips
+      geoKey: "06"
+      enabled: true
+
+    # NOTE: Remaining state GSP series follow the pattern <STABBR>NGSP.
+
+    # ── Metro GDP (RGMP*) ─────────────────────────────────────────────────
+    - seriesId: RGMP26420
+      category: economic.gdp_real
+      geoLevel: metro
+      geoKeyType: cbsa
+      geoKey: "26420"
+      enabled: true
+
+    # NOTE: Full RGMP* series for all CBSAs available from FRED search.

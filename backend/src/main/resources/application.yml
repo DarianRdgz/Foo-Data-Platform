@@ -36,6 +36,23 @@ zillow:
   batch-size: ${ZILLOW_BATCH_SIZE:750}
   download-retries: ${ZILLOW_DOWNLOAD_RETRIES:3}
 
+cde:
+  base-url: ${CDE_BASE_URL:https://api.usa.gov/crime/fbi/sapi}
+  api-key: ${CDE_API_KEY:}
+  offenses-known-path: ${CDE_OFFENSES_PATH:/api/srs/tables/offenses/states}
+  clearances-path: ${CDE_CLEARANCES_PATH:/api/srs/tables/clearances/states}
+  connect-timeout-seconds: 30
+  read-timeout-seconds: 60
+
+fred:
+  api-key: ${FRED_API_KEY:}
+  base-url: ${FRED_BASE_URL:https://api.stlouisfed.org}
+  connect-timeout-seconds: 10
+  read-timeout-seconds: 30
+  rate-limiter:
+    limit-for-period-per-minute: 100  # FRED allows 120/min
+    timeout-millis: 5000
+
 fdp:
   admin:
     api-key: ${FDP_ADMIN_API_KEY:}
@@ -70,6 +87,14 @@ fdp:
         cron: "0 30 3 17 * *"
       affordability:
         cron: "0 45 3 17 * *"
+    crime:
+      enabled: false
+      cde:
+        cron: "0 0 4 1 10 *"   # 4:00am on 1st October (FBI releases prior-year data in September)
+    fred:
+      enabled: false
+      series:
+        cron: "0 0 5 2 * *"    # 5:00am on the 2nd of each month
   geo:
       levels:
         enabled: [national, state, metro, county, city, zip]

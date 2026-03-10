@@ -24,6 +24,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       FDP_GEO_SEEDING_ENABLED: ${FDP_GEO_SEEDING_ENABLED:-false}
       FDP_GEO_SEED_DIR: ${FDP_GEO_SEED_DIR:-/opt/fdp/seed}
+      CDE_API_KEY: ${CDE_API_KEY}
     depends_on:
       - db
     ports:
