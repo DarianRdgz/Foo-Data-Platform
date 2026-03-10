@@ -1,5 +1,6 @@
 package com.fooholdings.fdp.core.ingestion;
 
+import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 
@@ -56,15 +57,15 @@ public class IngestionLockService {
          * ON CONFLICT DO UPDATE WHERE is false, the lock is still valid.
          */
         int affected = jdbc.update("""
-                INSERT INTO fdp_core.ingestion_lock (source_system_id, locked_at, locked_by, expires_at)
-                VALUES (?, now(), ?, ?)
-                ON CONFLICT (source_system_id) DO UPDATE
-                  SET locked_at  = EXCLUDED.locked_at,
-                      locked_by  = EXCLUDED.locked_by,
-                      expires_at = EXCLUDED.expires_at
-                  WHERE fdp_core.ingestion_lock.expires_at < now()
-                """,
-                sourceSystemId, lockedBy, expiresAt
+            INSERT INTO fdp_core.ingestion_lock (source_system_id, locked_at, locked_by, expires_at)
+            VALUES (?, now(), ?, ?)
+            ON CONFLICT (source_system_id) DO UPDATE
+            SET locked_at  = EXCLUDED.locked_at,
+                locked_by  = EXCLUDED.locked_by,
+                expires_at = EXCLUDED.expires_at
+            WHERE fdp_core.ingestion_lock.expires_at < now()
+            """,
+            sourceSystemId, lockedBy, Timestamp.from(expiresAt)   // ← was just expiresAt
         );
 
         boolean acquired = affected > 0;

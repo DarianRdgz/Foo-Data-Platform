@@ -11,27 +11,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  *  - The scheduler bean always exists (admin dashboard can inspect / toggle it)
  *  - No app restart is needed to enable/disable (future dashboard support)
  *
- * Example YAML:
- * <pre>
- * fdp:
- *   scheduler:
- *     kroger:
- *       enabled: false          # off until admin dashboard is ready
- *       locations:
- *         cron: "0 0 2 * * *"  # 2am daily
- *         zipCodes:
- *           - "77002"
- *       products:
- *         cron: "0 30 2 * * *" # 2:30am daily
- *         locationIds:
- *           - "01400301"
- *         searchTerms:
- *           - "milk"
- *           - "eggs"
- * </pre>
  */
 @ConfigurationProperties(prefix = "fdp.scheduler")
-public record FdpSchedulerProperties(Kroger kroger) {
+public record FdpSchedulerProperties(Kroger kroger, Zillow zillow) {
 
     public record Kroger(
             boolean enabled,
@@ -49,4 +31,14 @@ public record FdpSchedulerProperties(Kroger kroger) {
             List<String> locationIds,
             List<String> searchTerms
     ) {}
+
+    public record Zillow(
+            boolean enabled,
+            Job zhvi,
+            Job zori,
+            Job listings,
+            Job affordability
+    ) {}
+
+    public record Job(String cron) {}
 }

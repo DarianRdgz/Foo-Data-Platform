@@ -2,14 +2,16 @@ package com.fooholdings.fdp;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 import com.fooholdings.fdp.admin.security.AdminSecurityProperties;
 import com.fooholdings.fdp.api.service.Where2MoveStaplesProperties;
 import com.fooholdings.fdp.core.scheduler.FdpSchedulerProperties;
-import com.fooholdings.fdp.sources.kroger.config.KrogerProperties;
 import com.fooholdings.fdp.geo.config.GeoProperties;
+import com.fooholdings.fdp.sources.kroger.config.KrogerProperties;
+import com.fooholdings.fdp.sources.zillow.config.ZillowProperties;
 
 /**
  * Entry point for Foo Data Platform.
@@ -18,6 +20,7 @@ import com.fooholdings.fdp.geo.config.GeoProperties;
  */
 @SpringBootApplication
 @EnableScheduling
+@ConfigurationPropertiesScan
 @EnableConfigurationProperties({
         KrogerProperties.class,
         Where2MoveStaplesProperties.class,
@@ -25,7 +28,8 @@ import com.fooholdings.fdp.geo.config.GeoProperties;
         AdminSecurityProperties.class,
         com.fooholdings.fdp.admin.security.AdminSecurityProperties.class,
         com.fooholdings.fdp.admin.ingestion.FdpQuotaProperties.class,
-        GeoProperties.class
+        GeoProperties.class,
+        ZillowProperties.class
 })
 public class FdpApplication {
 

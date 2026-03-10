@@ -30,6 +30,7 @@ services:
       - "8080:8080"
     volumes:
       - ./docker/seed:/opt/fdp/seed:ro
+      - ./docker/zillow:/opt/fdp/zillow:ro
 
   test:
     image: maven:3.9-eclipse-temurin-21
@@ -38,6 +39,7 @@ services:
       - ./backend:/workspace
       - ~/.m2:/root/.m2
       - ./docker/seed:/opt/fdp/seed:ro
+      - ./docker/zillow:/opt/fdp/zillow:ro
     env_file:
       - .env
     environment:

@@ -431,7 +431,7 @@ export default function AdminIngestion() {
 
                   <div className="rounded-xl border border-slate-200 p-4">
                     <div className="text-xs font-semibold tracking-wide text-slate-500">Requested scope</div>
-                    <pre className="mt-2 overflow-auto rounded-lg bg-slate-50 p-3 text-xs text-slate-800">
+                    <pre className="mt-2 overflow-auto max-h-40 rounded-lg bg-slate-50 p-3 text-xs text-slate-800">
 {detail.requestedScopeJson || '—'}
                     </pre>
                   </div>
@@ -439,7 +439,7 @@ export default function AdminIngestion() {
                   {(detail.status || '').toUpperCase() === 'FAILED' ? (
                     <div className="rounded-xl border border-red-200 bg-red-50 p-4">
                       <div className="text-xs font-semibold tracking-wide text-red-800">Error detail</div>
-                      <pre className="mt-2 overflow-auto rounded-lg bg-white/60 p-3 text-xs text-red-900">
+                      <pre className="mt-2 overflow-auto max-h-64 rounded-lg bg-white/60 p-3 text-xs text-red-900">
 {detail.errorDetail || '—'}
                       </pre>
                     </div>

@@ -30,6 +30,12 @@ kroger:
     token-url: https://api-ce.kroger.com/v1/connect/oauth2/token
     scope: product.compact
 
+zillow:
+  data-dir: ${ZILLOW_DATA_DIR:/opt/fdp/zillow}
+  base-url: ${ZILLOW_BASE_URL:https://files.zillowstatic.com/research/public_csvs}
+  batch-size: ${ZILLOW_BATCH_SIZE:750}
+  download-retries: ${ZILLOW_DOWNLOAD_RETRIES:3}
+
 fdp:
   admin:
     api-key: ${FDP_ADMIN_API_KEY:}
@@ -38,29 +44,35 @@ fdp:
       KROGER: ${FDP_QUOTA_KROGER_DAILY_LIMIT:10000}
   scheduler:
     kroger:
-      enabled: false                  # flip to true via admin dashboard when ready
+      enabled: false                  
       locations:
-        cron: "0 0 2 * * *"          # 2:00am daily (sec min hour day month weekday)
+        cron: "0 0 2 * * *"          # 2:00am daily
         zipCodes:
           - "77002"
           - "77003"
           - "77004"
       products:
-        cron: "0 30 2 * * *"         # 2:30am daily (runs after locations)
-        locationIds: []               # populate with real Kroger location IDs from store_location
+        cron: "0 30 2 * * *"         # 2:30am daily 
+        locationIds: []               
         searchTerms:
           - "milk"
           - "eggs"
           - "bread"
           - "rice"
           - "chicken"
+    zillow:
+      enabled: false
+      zhvi:
+        cron: "0 0 3 17 * *"
+      zori:
+        cron: "0 15 3 17 * *"
+      listings:
+        cron: "0 30 3 17 * *"
+      affordability:
+        cron: "0 45 3 17 * *"
   geo:
-      # Sprint 5: gate early MVP ingestion/queries to specific levels if needed
       levels:
         enabled: [national, state, metro, county, city, zip]
-
-      # One-time bootstrap of geo_areas from CSVs mounted into the container.
-      # Turn on for a single run, then turn back off.
       seeding:
         enabled: ${FDP_GEO_SEEDING_ENABLED:false}
         seedDir: ${FDP_GEO_SEED_DIR:/opt/fdp/seed}
