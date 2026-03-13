@@ -14,6 +14,9 @@ import com.fooholdings.fdp.sources.kroger.config.KrogerProperties;
 import com.fooholdings.fdp.sources.zillow.config.ZillowProperties;
 import com.fooholdings.fdp.sources.cde.config.CdeProperties;
 import com.fooholdings.fdp.sources.fred.config.FredProperties;
+import com.fooholdings.fdp.sources.collegescorecard.config.CollegeScorecardProperties;
+import com.fooholdings.fdp.sources.fema.config.FemaProperties;
+import com.fooholdings.fdp.sources.noaa.config.NoaaProperties;
 import com.fooholdings.fdp.admin.ingestion.FdpQuotaProperties;
 
 /**
@@ -28,12 +31,15 @@ import com.fooholdings.fdp.admin.ingestion.FdpQuotaProperties;
         KrogerProperties.class,
         Where2MoveStaplesProperties.class,
         FdpSchedulerProperties.class,
-        AdminSecurityProperties.class,          // ← only once (removed duplicate)
+        AdminSecurityProperties.class,
         FdpQuotaProperties.class,
         GeoProperties.class,
         ZillowProperties.class,
         CdeProperties.class,
-        FredProperties.class
+        FredProperties.class,
+        CollegeScorecardProperties.class,  
+        FemaProperties.class,               
+        NoaaProperties.class 
 })
 public class FdpApplication {
 

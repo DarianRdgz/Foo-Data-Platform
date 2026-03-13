@@ -18,7 +18,9 @@ public record FdpSchedulerProperties(Kroger kroger, Zillow zillow, Crime crime, 
         public record Kroger(
                 boolean enabled,
                 Locations locations,
-                Products products
+                Products products,
+                Education education,
+                Disaster disaster 
         ) {}
 
         public record Locations(
@@ -48,6 +50,17 @@ public record FdpSchedulerProperties(Kroger kroger, Zillow zillow, Crime crime, 
         public record Fred(
                 boolean enabled,
                 Job series
+        ) {}
+
+        public record Education(
+                boolean enabled,
+                Job collegeScorecard
+        ) {}
+
+        public record Disaster(
+                boolean enabled,
+                Job fema,
+                Job noaa
         ) {}
 
     public record Job(String cron) {}

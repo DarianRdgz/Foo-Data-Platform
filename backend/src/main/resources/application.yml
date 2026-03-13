@@ -53,6 +53,24 @@ fred:
     limit-for-period-per-minute: 100  # FRED allows 120/min
     timeout-millis: 5000
 
+college-scorecard:
+  base-url: ${COLLEGESCORECARD_BASE_URL:https://api.data.gov/ed/collegescorecard}
+  api-key: ${COLLEGESCORECARD_API_KEY:}
+  schools-path: /v1/schools.json
+  page-size: ${COLLEGESCORECARD_PAGE_SIZE:100}
+  connect-timeout-seconds: 30
+  read-timeout-seconds: 60
+
+fema:
+  disaster-declarations-url: ${FEMA_DISASTER_DECLARATIONS_URL:https://www.fema.gov/api/open/v2/DisasterDeclarationsSummaries.csv}
+  connect-timeout-seconds: 30
+  read-timeout-seconds: 120
+
+noaa:
+  storm-events-base-url: ${NOAA_STORM_EVENTS_BASE_URL:https://www.ncei.noaa.gov/pub/data/swdi/stormevents/csvfiles}
+  connect-timeout-seconds: 30
+  read-timeout-seconds: 120
+
 fdp:
   admin:
     api-key: ${FDP_ADMIN_API_KEY:}
@@ -95,6 +113,16 @@ fdp:
       enabled: false
       series:
         cron: "0 0 5 2 * *"    # 5:00am on the 2nd of each month
+    education:
+      enabled: false
+      college-scorecard:
+        cron: "0 0 6 2 8 *"    # 6:00am on 2nd August (Scorecard releases yearly data in late July)
+    disaster:
+      enabled: false
+      fema:
+        cron: "0 0 7 5 1 *"    # 7:00am on 5th January
+      noaa:
+        cron: "0 30 7 5 1 *"   # 7:30am on 5th January (staggered after FEMA)
   geo:
       levels:
         enabled: [national, state, metro, county, city, zip]

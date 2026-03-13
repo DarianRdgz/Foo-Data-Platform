@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import com.fooholdings.fdp.core.ingestion.IngestionLockException;
 import com.fooholdings.fdp.core.logging.ErrorCategory;
 import com.fooholdings.fdp.core.logging.ErrorCategoryMdc;
+import com.fooholdings.fdp.geo.support.GeoAreaNotFoundException;
 import com.fooholdings.fdp.sources.kroger.client.KrogerApiException;
 
 /**
@@ -105,6 +106,15 @@ public class ApiExceptionHandler {
         }
         return ResponseEntity.badRequest()
                 .body(new ErrorBody("VALIDATION_ERROR", "Request body is required and must be valid JSON."));
+    }
+
+    @ExceptionHandler(GeoAreaNotFoundException.class)
+    public ResponseEntity<ErrorBody> geoNotFound(GeoAreaNotFoundException ex) {
+        try (@SuppressWarnings("unused") var cat = ErrorCategoryMdc.with(ErrorCategory.VALIDATION_ERROR)) {
+            log.warn("Geo area not found: {}", ex.getMessage());
+        }
+        return ResponseEntity.status(404)
+                .body(new ErrorBody("NOT_FOUND", ex.getMessage()));
     }
 
     /** Consistent JSON body for all error responses. */
