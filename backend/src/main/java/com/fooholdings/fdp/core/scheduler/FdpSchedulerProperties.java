@@ -13,14 +13,19 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  *
  */
 @ConfigurationProperties(prefix = "fdp.scheduler")
-public record FdpSchedulerProperties(Kroger kroger, Zillow zillow, Crime crime, Fred fred) {
+public record FdpSchedulerProperties(
+        Kroger kroger,
+        Zillow zillow,
+        Crime crime,
+        Fred fred,
+        Education education,
+        Disaster disaster
+) {
 
         public record Kroger(
                 boolean enabled,
                 Locations locations,
-                Products products,
-                Education education,
-                Disaster disaster 
+                Products products
         ) {}
 
         public record Locations(

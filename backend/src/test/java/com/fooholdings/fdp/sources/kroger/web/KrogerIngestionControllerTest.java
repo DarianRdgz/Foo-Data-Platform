@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -23,6 +24,7 @@ import com.fooholdings.fdp.sources.kroger.ingestion.KrogerProductIngestionServic
  * Service layer is mocked with @MockitoBean (Spring Boot 4 replacement for @MockBean)
  */
 @WebMvcTest(KrogerIngestionController.class)
+@TestPropertySource(properties = "cde.api-key=test-key")
 class KrogerIngestionControllerTest {
 
     @Autowired

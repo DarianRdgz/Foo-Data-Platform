@@ -39,8 +39,8 @@ zillow:
 cde:
   base-url: ${CDE_BASE_URL:https://api.usa.gov/crime/fbi/sapi}
   api-key: ${CDE_API_KEY:}
-  offenses-known-path: ${CDE_OFFENSES_PATH:/api/srs/tables/offenses/states}
-  clearances-path: ${CDE_CLEARANCES_PATH:/api/srs/tables/clearances/states}
+  offenses-known-path: ${CDE_OFFENSES_PATH:api/srs/tables/offenses/states}
+  clearances-path: ${CDE_CLEARANCES_PATH:api/srs/tables/clearances/states}
   connect-timeout-seconds: 30
   read-timeout-seconds: 60
 

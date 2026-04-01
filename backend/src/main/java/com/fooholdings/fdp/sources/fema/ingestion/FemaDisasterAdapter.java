@@ -41,10 +41,6 @@ public class FemaDisasterAdapter {
     static final String CATEGORY = "risk.disaster.fema";
     static final int    WINDOW_YEARS = 10;
 
-    // Handles both "2023-04-15T00:00:00.000Z" and "2023-04-15"
-    private static final DateTimeFormatter ISO_DATE_LOOSE =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd['T'HH:mm:ss.SSS'Z']");
-
     private final FemaClient client;
     private final GeoAreaJdbcRepository geoRepo;
     private final AreaSnapshotJdbcRepository snapshotRepo;

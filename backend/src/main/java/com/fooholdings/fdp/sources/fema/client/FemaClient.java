@@ -1,7 +1,5 @@
 package com.fooholdings.fdp.sources.fema.client;
 
-import java.io.BufferedReader;
-import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -51,6 +49,12 @@ public class FemaClient {
 
     private List<FemaDisasterDeclarationRecord> parseDeclarations(String csv) {
         List<FemaDisasterDeclarationRecord> records = new ArrayList<>();
+        
+        if (csv.startsWith("\uFEFF")) {
+            log.warn("FEMA: stripping UTF-8 BOM — this would have caused 0 rows silently");
+            csv = csv.substring(1);
+        }
+        
         String[] lines = csv.split("\n", -1);
 
         if (lines.length < 2) return records;
@@ -60,6 +64,9 @@ public class FemaClient {
         int countyIdx   = indexOf(header, "fipsCountyCode",  "countyCode");
         int typeIdx     = indexOf(header, "incidentType");
         int dateIdx     = indexOf(header, "declarationDate");
+
+        log.info("FEMA: column indexes — fipsStateCode={}, fipsCountyCode={}, incidentType={}, declarationDate={}",
+        stateIdx, countyIdx, typeIdx, dateIdx);
 
         if (stateIdx < 0 || typeIdx < 0 || dateIdx < 0) {
             throw new IllegalStateException(
@@ -73,12 +80,12 @@ public class FemaClient {
 
             String[] cols = splitCsvLine(line);
 
-            String stateFips    = valueAt(cols, stateIdx);
-            String countyFips3  = valueAt(cols, countyIdx);   // may be null or "000"
+            String stateFips    = normalizeStateFips(valueAt(cols, stateIdx));
+            String countyFips3  = normalizeCountyFips(valueAt(cols, countyIdx));   // may be null or "000"
             String incidentType = valueAt(cols, typeIdx);
             String declDate     = valueAt(cols, dateIdx);
 
-            if (stateFips == null || incidentType == null || declDate == null) {
+            if (stateFips == null) {
                 skipped++;
                 continue;
             }
@@ -88,7 +95,7 @@ public class FemaClient {
 
             // "000" means statewide declaration — no county
             boolean statewide = countyFips3 == null || countyFips3.equals("000");
-            String countyFips5 = statewide ? null : stateFips + zeroPad(countyFips3, 3);
+            String countyFips5 = statewide ? null : stateFips + countyFips3;
 
             records.add(new FemaDisasterDeclarationRecord(
                     stateFips, countyFips5, incidentType, declDate));
@@ -124,5 +131,92 @@ public class FemaClient {
     private static String zeroPad(String s, int length) {
         if (s == null) return null;
         return "0".repeat(Math.max(0, length - s.length())) + s;
+    }
+
+    private static String normalizeStateFips(String raw) {
+        if (raw == null) return null;
+
+        String v = raw.trim().replace("\"", "");
+        if (v.endsWith(".0")) v = v.substring(0, v.length() - 2);
+        if (v.isBlank()) return null;
+
+        // Already numeric FIPS
+        if (v.matches("\\d{1,2}")) {
+            return v.length() == 1 ? "0" + v : v;
+        }
+
+        // FEMA is giving postal abbreviations in this feed; convert to numeric FIPS
+        return switch (v.toUpperCase()) {
+            case "AL" -> "01";
+            case "AK" -> "02";
+            case "AZ" -> "04";
+            case "AR" -> "05";
+            case "CA" -> "06";
+            case "CO" -> "08";
+            case "CT" -> "09";
+            case "DE" -> "10";
+            case "DC" -> "11";
+            case "FL" -> "12";
+            case "GA" -> "13";
+            case "HI" -> "15";
+            case "ID" -> "16";
+            case "IL" -> "17";
+            case "IN" -> "18";
+            case "IA" -> "19";
+            case "KS" -> "20";
+            case "KY" -> "21";
+            case "LA" -> "22";
+            case "ME" -> "23";
+            case "MD" -> "24";
+            case "MA" -> "25";
+            case "MI" -> "26";
+            case "MN" -> "27";
+            case "MS" -> "28";
+            case "MO" -> "29";
+            case "MT" -> "30";
+            case "NE" -> "31";
+            case "NV" -> "32";
+            case "NH" -> "33";
+            case "NJ" -> "34";
+            case "NM" -> "35";
+            case "NY" -> "36";
+            case "NC" -> "37";
+            case "ND" -> "38";
+            case "OH" -> "39";
+            case "OK" -> "40";
+            case "OR" -> "41";
+            case "PA" -> "42";
+            case "RI" -> "44";
+            case "SC" -> "45";
+            case "SD" -> "46";
+            case "TN" -> "47";
+            case "TX" -> "48";
+            case "UT" -> "49";
+            case "VT" -> "50";
+            case "VA" -> "51";
+            case "WA" -> "53";
+            case "WV" -> "54";
+            case "WI" -> "55";
+            case "WY" -> "56";
+            case "AS" -> "60";
+            case "GU" -> "66";
+            case "MP" -> "69";
+            case "PR" -> "72";
+            case "VI" -> "78";
+            default -> null;
+        };
+    }
+
+    private static String normalizeCountyFips(String raw) {
+        if (raw == null) return null;
+
+        String v = raw.trim().replace("\"", "");
+        if (v.endsWith(".0")) v = v.substring(0, v.length() - 2);
+        if (v.isBlank()) return null;
+
+        // Keep only numeric county codes
+        if (!v.matches("\\d{1,3}")) return null;
+
+        return zeroPad(v, 3);
     }
 }

@@ -197,7 +197,7 @@ public class NoaaStormEventsClient {
      * Parses NOAA abbreviated damage values: "1.5K" → 1500.0, "2.5M" → 2500000.0.
      * Returns 0.0 for null, blank, or "0".
      */
-    static double parseDamage(String raw) {
+    public static double parseDamage(String raw) {
         if (raw == null || raw.isBlank() || raw.equals("0")) return 0.0;
         raw = unquote(raw.trim().toUpperCase());
         if (raw == null) return 0.0;
