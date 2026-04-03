@@ -8,12 +8,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import com.fasterxml.jackson.core.JacksonException;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fooholdings.fdp.core.persistence.IngestionRunEntity;
 import com.fooholdings.fdp.core.persistence.IngestionRunRepository;
 import com.fooholdings.fdp.core.source.SourceSystemService;
-
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.ObjectMapper;
 
 /**
  * Manages the lifecycle of fdp_core.ingestion_run records.
@@ -37,11 +36,11 @@ public class IngestionRunService {
 
     private final IngestionRunRepository repo;
     private final SourceSystemService sourceSystemService;
-    private final ObjectMapper mapper;
+    private final JsonMapper mapper;
 
     public IngestionRunService(IngestionRunRepository repo,
                                SourceSystemService sourceSystemService,
-                               ObjectMapper mapper) {
+                               JsonMapper mapper) {
         this.repo = repo;
         this.sourceSystemService = sourceSystemService;
         this.mapper = mapper;

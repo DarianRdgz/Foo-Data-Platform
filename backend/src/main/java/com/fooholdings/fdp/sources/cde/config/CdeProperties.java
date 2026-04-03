@@ -1,24 +1,38 @@
 package com.fooholdings.fdp.sources.cde.config;
 
+import java.nio.file.Path;
+
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-/**
- * Externalized config for the FBI Crime Data Explorer adapter.
- * baseUrl and paths are environment-overridable for local development and CI stubbing.
- */
 @ConfigurationProperties(prefix = "cde")
 public record CdeProperties(
-        String baseUrl,
-        String apiKey,
-        String offensesKnownPath,
-        String clearancesPath,
+        Mode mode,
+        String downloadPageUrl,
+        String downloadDir,
+        String workDir,
         int connectTimeoutSeconds,
         int readTimeoutSeconds
 ) {
-        public CdeProperties {
-        if (apiKey == null || apiKey.isBlank()) {
-            throw new IllegalStateException(
-                "CDE_API_KEY is not set. Register at https://api.data.gov/signup/");
+    public enum Mode {
+        LOCAL,
+        PORTAL_DOWNLOAD
+    }
+
+    public CdeProperties {
+        mode = mode == null ? Mode.LOCAL : mode;
+        if (downloadDir == null || downloadDir.isBlank()) {
+            throw new IllegalStateException("cde.download-dir must be configured");
         }
+        if (workDir == null || workDir.isBlank()) {
+            throw new IllegalStateException("cde.work-dir must be configured");
+        }
+    }
+
+    public Path downloadDirPath() {
+        return Path.of(downloadDir);
+    }
+
+    public Path workDirPath() {
+        return Path.of(workDir);
     }
 }

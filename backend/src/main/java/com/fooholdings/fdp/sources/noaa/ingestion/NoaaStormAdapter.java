@@ -11,8 +11,10 @@ import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
+import com.fooholdings.fdp.geo.event.AreaIngestCompletedEvent;
 import com.fooholdings.fdp.geo.repo.AreaSnapshotJdbcRepository;
 import com.fooholdings.fdp.geo.repo.AreaSnapshotJdbcRepository.AreaSnapshotUpsert;
 import com.fooholdings.fdp.geo.repo.GeoAreaJdbcRepository;
@@ -42,13 +44,16 @@ public class NoaaStormAdapter {
     private final NoaaStormEventsClient client;
     private final GeoAreaJdbcRepository geoRepo;
     private final AreaSnapshotJdbcRepository snapshotRepo;
+    private final ApplicationEventPublisher eventPublisher;
 
     public NoaaStormAdapter(NoaaStormEventsClient client,
                             GeoAreaJdbcRepository geoRepo,
-                            AreaSnapshotJdbcRepository snapshotRepo) {
+                            AreaSnapshotJdbcRepository snapshotRepo,
+                            ApplicationEventPublisher eventPublisher) {
         this.client = client;
         this.geoRepo = geoRepo;
         this.snapshotRepo = snapshotRepo;
+        this.eventPublisher = eventPublisher;
     }
 
     public int ingest() {
@@ -60,6 +65,10 @@ public class NoaaStormAdapter {
         rows.addAll(buildCountyRows(records, snapshotPeriod));
 
         int written = snapshotRepo.batchUpsert(deduplicate(rows));
+
+        if (written > 0) {
+            eventPublisher.publishEvent(new AreaIngestCompletedEvent(this, SOURCE, null, written));
+        }
         log.info("NOAA: wrote {} area_snapshot rows", written);
         return written;
     }

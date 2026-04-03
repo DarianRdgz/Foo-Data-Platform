@@ -13,5 +13,6 @@ public record AreaSnapshotView(
         LocalDate snapshotPeriod,
         String source,
         boolean isRollup,
-        Map<String, Object> payload
+        Map<String, Object> payload,
+        ChangeBadgeView change
 ) {}

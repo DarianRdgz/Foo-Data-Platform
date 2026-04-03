@@ -37,10 +37,10 @@ zillow:
   download-retries: ${ZILLOW_DOWNLOAD_RETRIES:3}
 
 cde:
-  base-url: ${CDE_BASE_URL:https://api.usa.gov/crime/fbi/sapi}
-  api-key: ${CDE_API_KEY:}
-  offenses-known-path: ${CDE_OFFENSES_PATH:api/srs/tables/offenses/states}
-  clearances-path: ${CDE_CLEARANCES_PATH:api/srs/tables/clearances/states}
+  mode: ${CDE_MODE:LOCAL}
+  download-page-url: ${CDE_DOWNLOAD_PAGE_URL:https://cde.ucr.cjis.gov/LATEST/webapp/#/pages/downloads}
+  download-dir: ${CDE_DOWNLOAD_DIR:/opt/fdp/cde/inbox}
+  work-dir: ${CDE_WORK_DIR:/opt/fdp/cde/work}
   connect-timeout-seconds: 30
   read-timeout-seconds: 60
 

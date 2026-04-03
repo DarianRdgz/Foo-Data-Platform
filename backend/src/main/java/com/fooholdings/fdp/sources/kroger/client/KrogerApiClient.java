@@ -9,6 +9,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import com.fasterxml.jackson.core.JacksonException;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fooholdings.fdp.core.ingestion.ApiQuotaUsageService;
 import com.fooholdings.fdp.core.ingestion.RawPayloadService;
 import com.fooholdings.fdp.core.logging.MdcScope;
@@ -16,9 +18,6 @@ import com.fooholdings.fdp.sources.kroger.auth.KrogerTokenService;
 import com.fooholdings.fdp.sources.kroger.config.KrogerProperties;
 import com.fooholdings.fdp.sources.kroger.dto.locations.KrogerLocationResponse;
 import com.fooholdings.fdp.sources.kroger.dto.products.KrogerProductsResponse;
-
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.ObjectMapper;
 
 /**
  * HTTP client adapter for the Kroger v1 API.
@@ -49,14 +48,14 @@ public class KrogerApiClient {
     private final KrogerTokenService tokenService;
     private final RawPayloadService rawPayloadService;
     private final ApiQuotaUsageService quotaUsageService;
-    private final ObjectMapper objectMapper;
+    private final JsonMapper objectMapper;
 
     public KrogerApiClient(RestClient.Builder builder,
                            KrogerProperties props,
                            KrogerTokenService tokenService,
                            RawPayloadService rawPayloadService,
                            ApiQuotaUsageService quotaUsageService,
-                           ObjectMapper objectMapper) {
+                           JsonMapper objectMapper) {
         this.tokenService = tokenService;
         this.rawPayloadService = rawPayloadService;
         this.quotaUsageService = quotaUsageService;

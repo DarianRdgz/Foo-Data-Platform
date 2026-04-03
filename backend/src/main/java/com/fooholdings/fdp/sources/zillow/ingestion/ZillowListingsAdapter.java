@@ -2,12 +2,14 @@ package com.fooholdings.fdp.sources.zillow.ingestion;
 
 import java.util.List;
 
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.stereotype.Component;
+
 import com.fooholdings.fdp.geo.config.GeoLevelGate;
 import com.fooholdings.fdp.geo.repo.AreaSnapshotJdbcRepository;
 import com.fooholdings.fdp.sources.zillow.config.ZillowProperties;
 import com.fooholdings.fdp.sources.zillow.csv.ZillowCsvFetcher;
 import com.fooholdings.fdp.sources.zillow.csv.ZillowMetricFileSpec;
-import org.springframework.stereotype.Component;
 
 @Component
 public class ZillowListingsAdapter extends AbstractZillowAdapter {
@@ -17,9 +19,10 @@ public class ZillowListingsAdapter extends AbstractZillowAdapter {
             ZillowGeoResolver resolver,
             AreaSnapshotJdbcRepository snapshotRepo,
             GeoLevelGate geoLevelGate,
-            ZillowProperties props
+            ZillowProperties props,
+            ApplicationEventPublisher eventPublisher
     ) {
-        super(fetcher, resolver, snapshotRepo, geoLevelGate, props);
+        super(fetcher, resolver, snapshotRepo, geoLevelGate, props, eventPublisher);
     }
 
     public int ingest() {

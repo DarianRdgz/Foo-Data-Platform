@@ -13,12 +13,15 @@ import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
+import com.fooholdings.fdp.geo.event.AreaIngestCompletedEvent;
 import com.fooholdings.fdp.geo.repo.AreaSnapshotJdbcRepository;
 import com.fooholdings.fdp.geo.repo.AreaSnapshotJdbcRepository.AreaSnapshotUpsert;
 import com.fooholdings.fdp.geo.repo.GeoAreaJdbcRepository;
 import com.fooholdings.fdp.sources.fema.client.FemaClient;
+
 
 /**
  * Aggregates FEMA disaster declarations into area_snapshot rows.
@@ -44,13 +47,16 @@ public class FemaDisasterAdapter {
     private final FemaClient client;
     private final GeoAreaJdbcRepository geoRepo;
     private final AreaSnapshotJdbcRepository snapshotRepo;
+    private final ApplicationEventPublisher eventPublisher;
 
     public FemaDisasterAdapter(FemaClient client,
-                               GeoAreaJdbcRepository geoRepo,
-                               AreaSnapshotJdbcRepository snapshotRepo) {
+                                GeoAreaJdbcRepository geoRepo,
+                                AreaSnapshotJdbcRepository snapshotRepo,
+                                ApplicationEventPublisher eventPublisher) {
         this.client = client;
         this.geoRepo = geoRepo;
         this.snapshotRepo = snapshotRepo;
+        this.eventPublisher = eventPublisher;
     }
 
     public int ingest() {
@@ -70,7 +76,13 @@ public class FemaDisasterAdapter {
         rows.addAll(buildStateRows(recent, snapshotPeriod));
         rows.addAll(buildCountyRows(recent, snapshotPeriod));
 
+        
         int written = snapshotRepo.batchUpsert(deduplicate(rows));
+
+        if (written > 0) {
+            eventPublisher.publishEvent(new AreaIngestCompletedEvent(this, SOURCE, null, written));
+        }
+
         log.info("FEMA: wrote {} area_snapshot rows", written);
         return written;
     }

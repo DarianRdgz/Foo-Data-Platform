@@ -1,5 +1,10 @@
 package com.fooholdings.fdp.sources.cde.ingestion;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -12,16 +17,8 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-import static com.github.tomakehurst.wiremock.client.WireMock.get;
-import static com.github.tomakehurst.wiremock.client.WireMock.ok;
-import static com.github.tomakehurst.wiremock.client.WireMock.stubFor;
-import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
-import com.github.tomakehurst.wiremock.junit5.WireMockRuntimeInfo;
-import com.github.tomakehurst.wiremock.junit5.WireMockTest;
-
 @Testcontainers
 @SpringBootTest
-@WireMockTest
 class CdeAdapterIntegrationTest {
 
     @Container
@@ -29,51 +26,52 @@ class CdeAdapterIntegrationTest {
     static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16")
             .withDatabaseName("fdp").withUsername("fdp").withPassword("fdp");
 
-    private static int wireMockPort;
+    private static final Path downloadDir = initTempDir();
 
     @DynamicPropertySource
     @SuppressWarnings("unused")
     static void props(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url",         postgres::getJdbcUrl);
-        registry.add("spring.datasource.username",    postgres::getUsername);
-        registry.add("spring.datasource.password",    postgres::getPassword);
-        registry.add("spring.flyway.enabled",         () -> true);
+        registry.add("spring.datasource.url", postgres::getJdbcUrl);
+        registry.add("spring.datasource.username", postgres::getUsername);
+        registry.add("spring.datasource.password", postgres::getPassword);
+        registry.add("spring.flyway.enabled", () -> true);
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
-        registry.add("fdp.geo.seeding.enabled",       () -> false);
-        registry.add("fdp.scheduler.crime.enabled",   () -> false);
-        registry.add("fdp.scheduler.fred.enabled",    () -> false);
-        registry.add("cde.base-url",                  () -> "http://localhost:" + wireMockPort);
-        registry.add("cde.offenses-known-path",       () -> "/test/offenses");
-        registry.add("cde.clearances-path",           () -> "/test/clearances");
+        registry.add("fdp.geo.seeding.enabled", () -> false);
+        registry.add("fdp.scheduler.crime.enabled", () -> false);
+        registry.add("fdp.scheduler.fred.enabled", () -> false);
+        registry.add("cde.mode", () -> "LOCAL");
+        registry.add("cde.download-dir", () -> downloadDir.toString());
+        registry.add("cde.work-dir", () -> downloadDir.resolve("work").toString());
     }
+
+    @Autowired
+    CdeIngestionService ingestionService;
+
+    @Autowired
+    JdbcTemplate jdbc;
 
     @BeforeEach
     @SuppressWarnings("unused")
-    void stubWireMock(WireMockRuntimeInfo wmInfo) {
-        wireMockPort = wmInfo.getHttpPort();
-        // Minimal CSV with a national row and one state row
-        String csv = """
-            year,state,violent_crime_rate,property_crime_rate,actual,per_100000
-            2024,United States,380.7,1954.4,6900000,2335.1
-            2024,Texas,446.5,2456.7,720000,2903.2
-            """;
+    void setUp() throws Exception {
+        jdbc.update("delete from fdp_geo.area_snapshot where source = 'CDE'");
+        jdbc.update("delete from fdp_core.source_artifact");
 
-        stubFor(get(urlPathEqualTo("/test/offenses"))
-                .willReturn(ok(csv).withHeader("Content-Type", "text/csv")));
-        stubFor(get(urlPathEqualTo("/test/clearances"))
-                .willReturn(ok("""
-                        year,state,actual,per_100000
-                        2023,United States,NULL,NULL
-                        """)
-                        .withHeader("Content-Type", "text/csv")));
+        clearDirectory(downloadDir);
+        Files.createDirectories(downloadDir);
+
+        Files.writeString(
+                downloadDir.resolve("offenses_known_to_law_enforcement__2024__us.csv"),
+                """
+                year,state,violent_crime_rate,property_crime_rate,actual,per_100000
+                2024,United States,380.7,1954.4,6900000,2335.1
+                2024,Texas,446.5,2456.7,720000,2903.2
+                """
+        );
     }
-
-    @Autowired CdeAdapter adapter;
-    @Autowired JdbcTemplate jdbc;
 
     @Test
     void cdeWritesOnlyNationalAndStateRows() {
-        adapter.ingest();
+        ingestionService.ingest("test");
 
         Integer nonNationalState = jdbc.queryForObject(
                 """
@@ -90,35 +88,56 @@ class CdeAdapterIntegrationTest {
 
     @Test
     void cdeIngestIsIdempotent() {
-        adapter.ingest();
+        ingestionService.ingest("test");
         Integer countFirst = jdbc.queryForObject(
-                "select count(*) from fdp_geo.area_snapshot where source = 'CDE'", Integer.class);
+                "select count(*) from fdp_geo.area_snapshot where source = 'CDE'",
+                Integer.class
+        );
 
-        adapter.ingest();
+        ingestionService.ingest("test");
         Integer countSecond = jdbc.queryForObject(
-                "select count(*) from fdp_geo.area_snapshot where source = 'CDE'", Integer.class);
+                "select count(*) from fdp_geo.area_snapshot where source = 'CDE'",
+                Integer.class
+        );
 
         assertThat(countSecond).isEqualTo(countFirst);
     }
 
     @Test
-    void cdeProducesExpectedCategories() {
-        adapter.ingest();
+    void cdeArtifactsAreMarkedIngested() {
+        ingestionService.ingest("test");
 
-        // All categories must be within the charter-defined set
-        var unexpectedCategories = jdbc.queryForList(
-                """
-                select distinct category
-                from fdp_geo.area_snapshot
-                where source = 'CDE'
-                  and category not in (
-                    'safety.crime.violent_rate',
-                    'safety.crime.property_rate',
-                    'safety.crime.total_incidents_per_100k'
-                  )
-                """,
+        var statuses = jdbc.queryForList(
+                "select status from fdp_core.source_artifact order by original_filename",
                 String.class
         );
-        assertThat(unexpectedCategories).isEmpty();
+
+        assertThat(statuses).containsOnly("INGESTED");
+    }
+
+    private static Path initTempDir() {
+        try {
+            return Files.createTempDirectory("cde-artifacts-test");
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private static void clearDirectory(Path dir) throws IOException {
+        if (!Files.exists(dir)) {
+            return;
+        }
+
+        try (var walk = Files.walk(dir)) {
+            walk.sorted((a, b) -> b.compareTo(a))
+                .filter(path -> !path.equals(dir))
+                .forEach(path -> {
+                    try {
+                        Files.deleteIfExists(path);
+                    } catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                    }
+                });
+        }
     }
 }

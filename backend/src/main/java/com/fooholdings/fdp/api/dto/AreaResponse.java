@@ -1,6 +1,7 @@
 package com.fooholdings.fdp.api.dto;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -17,5 +18,7 @@ public record AreaResponse(
         String fipsCode,
         String cbsaCode,
         String zipCode,
+        GeoParentView parent,
+        Map<String, Object> boundingBox,
         List<AreaSnapshotView> snapshots
 ) {}

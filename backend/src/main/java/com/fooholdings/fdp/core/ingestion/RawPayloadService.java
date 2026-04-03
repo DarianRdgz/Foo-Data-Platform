@@ -9,10 +9,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import com.fasterxml.jackson.core.JacksonException;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fooholdings.fdp.core.source.SourceSystemService;
-
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.ObjectMapper;
 
 /**
  * Archives raw API response payloads to fdp_core.raw_payload.
@@ -38,11 +37,11 @@ public class RawPayloadService {
 
     private final JdbcTemplate jdbc;
     private final SourceSystemService sourceSystemService;
-    private final ObjectMapper mapper;
+    private final JsonMapper mapper;
 
     public RawPayloadService(JdbcTemplate jdbc,
                              SourceSystemService sourceSystemService,
-                             ObjectMapper mapper) {
+                             JsonMapper mapper) {
         this.jdbc = jdbc;
         this.sourceSystemService = sourceSystemService;
         this.mapper = mapper;

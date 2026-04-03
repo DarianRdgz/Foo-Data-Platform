@@ -13,10 +13,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import com.fasterxml.jackson.core.JacksonException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fooholdings.fdp.geo.repo.AreaSnapshotJdbcRepository;
 import com.fooholdings.fdp.geo.repo.AreaSnapshotJdbcRepository.AreaSnapshotUpsert;
-
-import tools.jackson.databind.ObjectMapper;
 
 /**
  * Computes the composite disaster risk score from FEMA and NOAA snapshots.
@@ -47,17 +48,18 @@ import tools.jackson.databind.ObjectMapper;
 public class DisasterRiskScoreService {
 
     private static final Logger log = LoggerFactory.getLogger(DisasterRiskScoreService.class);
+    private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
 
     static final String SOURCE   = "DISASTER_RISK";
     static final String CATEGORY = "risk.composite";
 
     private final JdbcTemplate jdbc;
     private final AreaSnapshotJdbcRepository snapshotRepo;
-    private final ObjectMapper objectMapper;
+    private final JsonMapper objectMapper;
 
     public DisasterRiskScoreService(JdbcTemplate jdbc,
                                     AreaSnapshotJdbcRepository snapshotRepo,
-                                    ObjectMapper objectMapper) {
+                                    JsonMapper objectMapper) {
         this.jdbc = jdbc;
         this.snapshotRepo = snapshotRepo;
         this.objectMapper = objectMapper;
@@ -94,7 +96,6 @@ public class DisasterRiskScoreService {
 
     // ── Data loading ──────────────────────────────────────────────────────
 
-    @SuppressWarnings("unchecked")
     private Map<UUID, SourcePayloads> loadLatestByGeo() {
         String sql = """
                 with ranked as (
@@ -122,8 +123,8 @@ public class DisasterRiskScoreService {
 
             Map<String, Object> payload;
             try {
-                payload = objectMapper.readValue(payloadText, Map.class);
-            } catch (Exception e) {
+                payload = objectMapper.readValue(payloadText, MAP_TYPE);
+            } catch (JacksonException | IllegalArgumentException e) {
                 log.warn("DisasterRiskScore: failed to parse payload for geo_id={} source={}: {}",
                          geoId, source, e.getMessage());
                 return;

@@ -11,8 +11,10 @@ import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
+import com.fooholdings.fdp.geo.event.AreaIngestCompletedEvent;
 import com.fooholdings.fdp.geo.repo.AreaSnapshotJdbcRepository;
 import com.fooholdings.fdp.geo.repo.AreaSnapshotJdbcRepository.AreaSnapshotUpsert;
 import com.fooholdings.fdp.geo.repo.GeoAreaJdbcRepository;
@@ -52,13 +54,16 @@ public class CollegeScorecardAdapter {
     private final CollegeScorecardClient client;
     private final GeoAreaJdbcRepository geoRepo;
     private final AreaSnapshotJdbcRepository snapshotRepo;
+    private final ApplicationEventPublisher eventPublisher;
 
     public CollegeScorecardAdapter(CollegeScorecardClient client,
-                                   GeoAreaJdbcRepository geoRepo,
-                                   AreaSnapshotJdbcRepository snapshotRepo) {
+                                    GeoAreaJdbcRepository geoRepo,
+                                    AreaSnapshotJdbcRepository snapshotRepo,
+                                    ApplicationEventPublisher eventPublisher) {
         this.client = client;
         this.geoRepo = geoRepo;
         this.snapshotRepo = snapshotRepo;
+        this.eventPublisher = eventPublisher;
     }
 
     public int ingest() {
@@ -72,6 +77,10 @@ public class CollegeScorecardAdapter {
         rows.addAll(buildCityRows(schools, snapshotPeriod));
 
         int written = snapshotRepo.batchUpsert(deduplicate(rows));
+
+        if (written > 0) {
+            eventPublisher.publishEvent(new AreaIngestCompletedEvent(this, SOURCE, null, written));
+        }
         log.info("CollegeScorecard: wrote {} area_snapshot rows (period={})", written, snapshotPeriod);
         return written;
     }

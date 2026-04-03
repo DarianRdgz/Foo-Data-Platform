@@ -7,15 +7,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
+
 import com.fooholdings.fdp.geo.config.GeoLevelGate;
+import com.fooholdings.fdp.geo.event.AreaIngestCompletedEvent;
 import com.fooholdings.fdp.geo.repo.AreaSnapshotJdbcRepository;
 import com.fooholdings.fdp.geo.repo.AreaSnapshotJdbcRepository.AreaSnapshotUpsert;
 import com.fooholdings.fdp.sources.zillow.config.ZillowProperties;
 import com.fooholdings.fdp.sources.zillow.csv.ZillowCsvFetcher;
 import com.fooholdings.fdp.sources.zillow.csv.ZillowCsvRecord;
 import com.fooholdings.fdp.sources.zillow.csv.ZillowMetricFileSpec;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public abstract class AbstractZillowAdapter {
 
@@ -26,26 +29,35 @@ public abstract class AbstractZillowAdapter {
     private final AreaSnapshotJdbcRepository snapshotRepo;
     private final GeoLevelGate geoLevelGate;
     private final ZillowProperties props;
+    private final ApplicationEventPublisher eventPublisher;
 
     protected AbstractZillowAdapter(
             ZillowCsvFetcher fetcher,
             ZillowGeoResolver resolver,
             AreaSnapshotJdbcRepository snapshotRepo,
             GeoLevelGate geoLevelGate,
-            ZillowProperties props
+            ZillowProperties props,
+            ApplicationEventPublisher eventPublisher
     ) {
         this.fetcher = fetcher;
         this.resolver = resolver;
         this.snapshotRepo = snapshotRepo;
         this.geoLevelGate = geoLevelGate;
         this.props = props;
+        this.eventPublisher = eventPublisher;
     }
 
     public int ingest(List<ZillowMetricFileSpec> specs) {
         int totalWritten = 0;
 
         for (ZillowMetricFileSpec spec : specs) {
-            totalWritten += ingestFile(spec);
+            int written = ingestFile(spec);
+            totalWritten += written;
+            if (written > 0) {
+                eventPublisher.publishEvent(
+                        new AreaIngestCompletedEvent(this, spec.sourceName(), spec.category(), written)
+                );
+            }
         }
 
         return totalWritten;

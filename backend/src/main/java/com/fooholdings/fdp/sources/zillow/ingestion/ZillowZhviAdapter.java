@@ -2,6 +2,7 @@ package com.fooholdings.fdp.sources.zillow.ingestion;
 
 import java.util.List;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 import com.fooholdings.fdp.geo.config.GeoLevelGate;
@@ -18,9 +19,10 @@ public class ZillowZhviAdapter extends AbstractZillowAdapter {
             ZillowGeoResolver resolver,
             AreaSnapshotJdbcRepository snapshotRepo,
             GeoLevelGate geoLevelGate,
-            ZillowProperties props
+            ZillowProperties props,
+            ApplicationEventPublisher eventPublisher
     ) {
-        super(fetcher, resolver, snapshotRepo, geoLevelGate, props);
+        super(fetcher, resolver, snapshotRepo, geoLevelGate, props, eventPublisher);
     }
 
     public int ingest() {

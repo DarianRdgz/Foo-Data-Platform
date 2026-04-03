@@ -86,6 +86,15 @@ public class ApiExceptionHandler {
                 .body(new ErrorBody("DB_ERROR", "A database error occurred."));
     }
 
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ErrorBody> illegalArgument(IllegalArgumentException ex) {
+        try (@SuppressWarnings("unused") var cat = ErrorCategoryMdc.with(ErrorCategory.VALIDATION_ERROR)) {
+            log.warn("Bad request: {}", ex.getMessage());
+        }
+        return ResponseEntity.badRequest()
+                .body(new ErrorBody("VALIDATION_ERROR", ex.getMessage()));
+    }
+
     /**
      * Catch-all for any unhandled exception.
      * HTTP 500

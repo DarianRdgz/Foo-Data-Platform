@@ -10,9 +10,11 @@ import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import com.fooholdings.fdp.geo.event.AreaIngestCompletedEvent;
 import com.fooholdings.fdp.geo.repo.AreaSnapshotJdbcRepository;
 import com.fooholdings.fdp.geo.repo.AreaSnapshotJdbcRepository.AreaSnapshotUpsert;
 import com.fooholdings.fdp.geo.repo.GeoAreaJdbcRepository;
@@ -44,21 +46,26 @@ public class FredAdapter {
     private final GeoAreaJdbcRepository geoRepo;
     private final AreaSnapshotJdbcRepository snapshotRepo;
     private final JdbcTemplate jdbc;
+    private final ApplicationEventPublisher eventPublisher;
 
     public FredAdapter(FredClient client, FredSeriesCatalog catalog,
                        GeoAreaJdbcRepository geoRepo, AreaSnapshotJdbcRepository snapshotRepo,
-                       JdbcTemplate jdbc) {
+                       JdbcTemplate jdbc, ApplicationEventPublisher eventPublisher) {
         this.client      = client;
         this.catalog     = catalog;
         this.geoRepo     = geoRepo;
         this.snapshotRepo = snapshotRepo;
         this.jdbc        = jdbc;
+        this.eventPublisher = eventPublisher;
     }
 
     public int ingest() {
         int totalWritten = 0;
         for (FredSeriesDefinition def : catalog.allEnabled()) {
             totalWritten += ingestSeries(def);
+        }
+        if (totalWritten > 0) {
+            eventPublisher.publishEvent(new AreaIngestCompletedEvent(this, SOURCE, null, totalWritten));
         }
         return totalWritten;
     }
