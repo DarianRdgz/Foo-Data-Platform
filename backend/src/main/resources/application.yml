@@ -72,6 +72,12 @@ noaa:
   read-timeout-seconds: 120
 
 fdp:
+  public-api:
+    cors:
+      allowed-origins:
+        - http://localhost:3000
+        - https://staging.aboutmyarea.net
+        - https://aboutmyarea.net
   admin:
     api-key: ${FDP_ADMIN_API_KEY:}
   quota:

@@ -8,11 +8,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.fooholdings.fdp.api.dto.AreaResponse;
+import com.fooholdings.fdp.api.dto.AreaSearchResponse;
 import com.fooholdings.fdp.api.dto.ChildrenResponse;
 import com.fooholdings.fdp.api.dto.HistoryResponse;
 import com.fooholdings.fdp.api.service.AreaChildrenQueryService;
 import com.fooholdings.fdp.api.service.AreaHistoryQueryService;
 import com.fooholdings.fdp.api.service.AreaQueryService;
+import com.fooholdings.fdp.api.service.AreaSearchQueryService;
 
 @RestController
 @RequestMapping("/api/area")
@@ -21,13 +23,16 @@ public class AreaApiController {
     private final AreaQueryService areaQueryService;
     private final AreaHistoryQueryService historyQueryService;
     private final AreaChildrenQueryService childrenQueryService;
+    private final AreaSearchQueryService areaSearchQueryService;
 
     public AreaApiController(AreaQueryService areaQueryService,
                              AreaHistoryQueryService historyQueryService,
-                             AreaChildrenQueryService childrenQueryService) {
+                             AreaChildrenQueryService childrenQueryService,
+                            AreaSearchQueryService areaSearchQueryService) {
         this.areaQueryService = areaQueryService;
         this.historyQueryService = historyQueryService;
         this.childrenQueryService = childrenQueryService;
+        this.areaSearchQueryService = areaSearchQueryService;
     }
 
     @GetMapping("/{geoLevel}/{geoId}")
@@ -48,5 +53,12 @@ public class AreaApiController {
     public ResponseEntity<ChildrenResponse> getChildren(@PathVariable String geoLevel,
                                                         @PathVariable String geoId) {
         return ResponseEntity.ok(childrenQueryService.getChildren(geoLevel, geoId));
+    }
+
+    @GetMapping("/search")
+    public AreaSearchResponse search(
+            @RequestParam("q") String query,
+            @RequestParam("level") String level) {
+        return areaSearchQueryService.search(query, level);
     }
 }

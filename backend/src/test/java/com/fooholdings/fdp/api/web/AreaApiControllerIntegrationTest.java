@@ -50,6 +50,7 @@ class AreaApiControllerIntegrationTest {
         r.add("fdp.scheduler.education.enabled", () -> false);
         r.add("fdp.scheduler.fred.enabled", () -> false);
         r.add("fdp.scheduler.crime.enabled", () -> false);
+        r.add("fdp.public-api.cors.allowed-origins[0]", () -> "https://aboutmyarea.net");
     }
 
     @Autowired MockMvc mvc;
@@ -157,6 +158,61 @@ class AreaApiControllerIntegrationTest {
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    void searchEndpointReturnsRankedResultsForSupportedLevel() throws Exception {
+        mvc.perform(get("/api/area/search")
+                        .queryParam("q", "Harris")
+                        .queryParam("level", "county")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.query").value("Harris"))
+                .andExpect(jsonPath("$.level").value("county"))
+                .andExpect(jsonPath("$.results").isArray());
+    }
+
+    @Test
+    void searchEndpointReturns400ForBlankQuery() throws Exception {
+        mvc.perform(get("/api/area/search")
+                        .queryParam("q", "   ")
+                        .queryParam("level", "county")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.path").value("/api/area/search"));
+    }
+
+    @Test
+    void searchEndpointReturns400ForSingleCharacterQuery() throws Exception {
+        mvc.perform(get("/api/area/search")
+                        .queryParam("q", "H")
+                        .queryParam("level", "county")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.path").value("/api/area/search"));
+    }
+
+    @Test
+    void searchEndpointReturns400ForUnsupportedLevel() throws Exception {
+        mvc.perform(get("/api/area/search")
+                        .queryParam("q", "Harris")
+                        .queryParam("level", "neighborhood")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.path").value("/api/area/search"));
+    }
+
+    @Test
+    void publicCorsPreflightAllowsConfiguredOrigin() throws Exception {
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options("/api/area/search")
+                        .header("Origin", "https://aboutmyarea.us")
+                        .header("Access-Control-Request-Method", "GET"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .string("Access-Control-Allow-Origin", "https://aboutmyarea.us"));
     }
 
     private void insertSnapshot(UUID geoId, String category, String source, LocalDate period, Map<String, Object> payload) throws Exception {
