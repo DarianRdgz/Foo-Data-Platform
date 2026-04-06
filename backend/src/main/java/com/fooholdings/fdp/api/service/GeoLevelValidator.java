@@ -14,6 +14,14 @@ final class GeoLevelValidator {
             "zip"
     );
 
+    private static final List<String> SUPPORTED_MAP_LEVELS = List.of(
+            "state",
+            "metro",
+            "county",
+            "city",
+            "zip"
+    );
+
     private GeoLevelValidator() {
     }
 
@@ -26,6 +34,20 @@ final class GeoLevelValidator {
         if (!SUPPORTED_LEVELS.contains(normalized)) {
             throw new IllegalArgumentException(
                     "geoLevel must be one of " + String.join(", ", SUPPORTED_LEVELS)
+            );
+        }
+        return normalized;
+    }
+
+    static String requireSupportedMapLevel(String geoLevel) {
+        if (geoLevel == null || geoLevel.isBlank()) {
+            throw new IllegalArgumentException("geoLevel is required");
+        }
+
+        String normalized = geoLevel.trim().toLowerCase(Locale.ROOT);
+        if (!SUPPORTED_MAP_LEVELS.contains(normalized)) {
+            throw new IllegalArgumentException(
+                    "map geoLevel must be one of " + String.join(", ", SUPPORTED_MAP_LEVELS)
             );
         }
         return normalized;

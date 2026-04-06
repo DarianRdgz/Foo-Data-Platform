@@ -2,6 +2,7 @@ package com.fooholdings.fdp.geo.seed;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -67,10 +68,12 @@ public class GeoSeedService {
                 );
                 String stateAbbr = get(parts, idx, "state_id");
                 String stateFips2 = mapStateAbbrToFips2(stateAbbr);
+                BigDecimal centroidLatitude = parseNullableDecimal(parts, idx, "lat");
+                BigDecimal centroidLongitude = parseNullableDecimal(parts, idx, "lng");
+
 
                 UUID stateGeoId = geoRepo.findStateGeoIdByFips(stateFips2)
                         .orElseThrow(() -> new IllegalStateException("Missing state geo_id for fips=" + stateFips2));
-
                 geoRepo.upsertGeoArea(
                         "metro",
                         null,
@@ -78,7 +81,9 @@ public class GeoSeedService {
                         null,
                         metroName,
                         stateGeoId,
-                        metroName
+                        metroName,
+                        centroidLatitude,
+                        centroidLongitude
                 );
                 insertedOrUpdated++;
             }
@@ -126,6 +131,9 @@ public class GeoSeedService {
                         ? countyFull
                         : countyName + " County";
 
+                BigDecimal centroidLatitude = parseNullableDecimal(parts, idx, "lat");
+                BigDecimal centroidLongitude = parseNullableDecimal(parts, idx, "lng");
+
                 geoRepo.upsertGeoArea(
                         "county",
                         countyFips5,
@@ -133,7 +141,9 @@ public class GeoSeedService {
                         null,
                         countyName,
                         stateGeoId,
-                        display
+                        display,
+                        centroidLatitude,
+                        centroidLongitude
                 );
                 insertedOrUpdated++;
             }
@@ -182,6 +192,9 @@ public class GeoSeedService {
                     continue;
                 }
 
+                BigDecimal centroidLatitude = parseNullableDecimal(parts, idx, "lat");
+                BigDecimal centroidLongitude = parseNullableDecimal(parts, idx, "lng");
+
                 geoRepo.upsertGeoArea(
                         "zip",
                         null,
@@ -189,7 +202,9 @@ public class GeoSeedService {
                         zip,
                         zip,
                         countyGeoId,
-                        zip
+                        zip,
+                        centroidLatitude,
+                        centroidLongitude
                 );
                 insertedOrUpdated++;
             }
@@ -254,6 +269,14 @@ public class GeoSeedService {
             }
         }
         return null;
+    }
+
+    private static BigDecimal parseNullableDecimal(String[] parts, Map<String, Integer> idx, String col) {
+        String raw = safeGet(parts, idx, col);
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        return new BigDecimal(raw.trim());
     }
 
     /**

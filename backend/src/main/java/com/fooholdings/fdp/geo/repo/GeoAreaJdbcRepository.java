@@ -1,12 +1,10 @@
 package com.fooholdings.fdp.geo.repo;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -168,50 +166,97 @@ public class GeoAreaJdbcRepository {
             UUID parentGeoId,
             String displayLabel
     ) {
+        return upsertGeoArea(
+                geoLevel,
+                fipsCode,
+                cbsaCode,
+                zipCode,
+                name,
+                parentGeoId,
+                displayLabel,
+                null,
+                null
+        );
+    }
+
+    public UUID upsertGeoArea(
+            String geoLevel,
+            String fipsCode,
+            String cbsaCode,
+            String zipCode,
+            String name,
+            UUID parentGeoId,
+            String displayLabel,
+            BigDecimal centroidLatitude,
+            BigDecimal centroidLongitude
+    ) {
         UUID inserted = jdbc.query(
                 """
-                insert into fdp_geo.geo_areas (geo_level, fips_code, cbsa_code, zip_code, name, parent_geo_id, display_label)
-                values (?::fdp_geo.geo_level, ?, ?, ?, ?, ?, ?)
+                insert into fdp_geo.geo_areas
+                    (geo_level, fips_code, cbsa_code, zip_code, name, parent_geo_id, display_label,
+                     centroid_latitude, centroid_longitude)
+                values
+                    (?::fdp_geo.geo_level, ?, ?, ?, ?, ?, ?, ?, ?)
                 on conflict do nothing
                 returning geo_id
                 """,
                 rs -> rs.next() ? UUID.fromString(rs.getString("geo_id")) : null,
-                geoLevel, fipsCode, cbsaCode, zipCode, name, parentGeoId, displayLabel
+                geoLevel, fipsCode, cbsaCode, zipCode, name, parentGeoId, displayLabel,
+                centroidLatitude, centroidLongitude
         );
 
-        if (inserted != null) {
-            return inserted;
-        }
+        UUID geoId = inserted != null
+                ? inserted
+                : resolveExistingGeoId(geoLevel, fipsCode, cbsaCode, zipCode, name, parentGeoId);
 
+        jdbc.update(
+                """
+                update fdp_geo.geo_areas
+                   set display_label = coalesce(?, display_label),
+                       centroid_latitude = coalesce(?, centroid_latitude),
+                       centroid_longitude = coalesce(?, centroid_longitude)
+                 where geo_id = ?
+                """,
+                displayLabel, centroidLatitude, centroidLongitude, geoId
+        );
+
+        return geoId;
+    }
+
+    private UUID resolveExistingGeoId(
+            String geoLevel,
+            String fipsCode,
+            String cbsaCode,
+            String zipCode,
+            String name,
+            UUID parentGeoId
+    ) {
         if (zipCode != null && !zipCode.isBlank()) {
             return jdbc.queryForObject(
                     "select geo_id from fdp_geo.geo_areas where geo_level = ?::fdp_geo.geo_level and zip_code = ?",
-                    new UuidMapper(), geoLevel, zipCode
+                    (rs, rowNum) -> UUID.fromString(rs.getString("geo_id")),
+                    geoLevel, zipCode
             );
         }
         if (cbsaCode != null && !cbsaCode.isBlank()) {
             return jdbc.queryForObject(
                     "select geo_id from fdp_geo.geo_areas where geo_level = ?::fdp_geo.geo_level and cbsa_code = ?",
-                    new UuidMapper(), geoLevel, cbsaCode
+                    (rs, rowNum) -> UUID.fromString(rs.getString("geo_id")),
+                    geoLevel, cbsaCode
             );
         }
         if (fipsCode != null && !fipsCode.isBlank()) {
             return jdbc.queryForObject(
                     "select geo_id from fdp_geo.geo_areas where geo_level = ?::fdp_geo.geo_level and fips_code = ?",
-                    new UuidMapper(), geoLevel, fipsCode
+                    (rs, rowNum) -> UUID.fromString(rs.getString("geo_id")),
+                    geoLevel, fipsCode
             );
         }
 
         return jdbc.queryForObject(
                 "select geo_id from fdp_geo.geo_areas where geo_level = ?::fdp_geo.geo_level and name = ? and parent_geo_id is not distinct from ?",
-                new UuidMapper(), geoLevel, name, parentGeoId
+                (rs, rowNum) -> UUID.fromString(rs.getString("geo_id")),
+                geoLevel, name, parentGeoId
         );
-    }
-
-    private static final class UuidMapper implements RowMapper<UUID> {
-        @Override
-        public UUID mapRow(ResultSet rs, int rowNum) throws SQLException {
-            return UUID.fromString(rs.getString(1));
-        }
     }
 }
