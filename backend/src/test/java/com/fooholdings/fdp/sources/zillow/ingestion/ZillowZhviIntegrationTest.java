@@ -32,6 +32,8 @@ class ZillowZhviIntegrationTest {
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
         registry.add("fdp.geo.seeding.enabled", () -> false);
         registry.add("fdp.scheduler.zillow.enabled", () -> false);
+        registry.add("fdp.sources.zillow.data-dir",
+            () -> "C:\\Users\\daria\\OneDrive\\Desktop\\github\\Foo-Data-Platform\\docker\\zillow");
     }
 
     @Autowired

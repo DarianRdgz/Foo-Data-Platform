@@ -208,11 +208,11 @@ class AreaApiControllerIntegrationTest {
     @Test
     void publicCorsPreflightAllowsConfiguredOrigin() throws Exception {
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options("/api/area/search")
-                        .header("Origin", "https://aboutmyarea.us")
+                        .header("Origin", "https://aboutmyarea.net")
                         .header("Access-Control-Request-Method", "GET"))
                 .andExpect(status().isOk())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
-                        .string("Access-Control-Allow-Origin", "https://aboutmyarea.us"));
+                        .string("Access-Control-Allow-Origin", "https://aboutmyarea.net"));
     }
 
     private void insertSnapshot(UUID geoId, String category, String source, LocalDate period, Map<String, Object> payload) throws Exception {
