@@ -18,6 +18,8 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -50,7 +52,10 @@ class AreaApiControllerIntegrationTest {
         r.add("fdp.scheduler.education.enabled", () -> false);
         r.add("fdp.scheduler.fred.enabled", () -> false);
         r.add("fdp.scheduler.crime.enabled", () -> false);
+
         r.add("fdp.public-api.cors.allowed-origins[0]", () -> "https://aboutmyarea.net");
+        r.add("fdp.public-api.cors.allowed-origins[1]", () -> "https://staging.aboutmyarea.net");
+        r.add("fdp.public-api.cors.allowed-origins[2]", () -> "http://localhost:3000");
     }
 
     @Autowired MockMvc mvc;
@@ -66,13 +71,12 @@ class AreaApiControllerIntegrationTest {
         jdbc.update("delete from fdp_geo.area_change_log");
         jdbc.update("delete from fdp_geo.area_snapshot where source in ('FRED','ZILLOW','DISASTER_RISK','ROLLUP_TEST')");
 
-        texasStateId = jdbc.queryForObject(
-                "select geo_id from fdp_geo.geo_areas where geo_level = 'state' and fips_code = '48' limit 1",
-                UUID.class);
+        // Make the test self-contained instead of assuming geo seed rows already exist.
+        jdbc.update("delete from fdp_geo.geo_areas where geo_level = 'county' and fips_code = '48201'");
+        jdbc.update("delete from fdp_geo.geo_areas where geo_level = 'state' and fips_code = '48'");
 
-        harrisCountyId = jdbc.queryForObject(
-                "select geo_id from fdp_geo.geo_areas where geo_level = 'county' and fips_code = '48201' limit 1",
-                UUID.class);
+        texasStateId = insertState("48", "Texas");
+        harrisCountyId = insertCounty("48201", "Harris", texasStateId);
     }
 
     @Test
@@ -92,6 +96,7 @@ class AreaApiControllerIntegrationTest {
 
         String body = mvc.perform(get("/api/area/state/{geoId}", "48"))
                 .andReturn().getResponse().getContentAsString();
+
         JsonNode root = objectMapper.readTree(body);
         List<JsonNode> housingSnapshots = new ArrayList<>();
         for (JsonNode snapshot : root.withArray("snapshots")) {
@@ -132,32 +137,49 @@ class AreaApiControllerIntegrationTest {
     }
 
     @Test
-    void areaEndpointsReturn404ForUnknownGeo() throws Exception {
+    void areaEndpointsReturnStructured404ForUnknownGeo() throws Exception {
         mvc.perform(get("/api/area/state/{geoId}", UUID.randomUUID()).accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.status").value("NOT_FOUND"));
+                .andExpect(jsonPath("$.status").value("NOT_FOUND"))
+                .andExpect(jsonPath("$.message").isNotEmpty())
+                .andExpect(jsonPath("$.path").value(org.hamcrest.Matchers.matchesPattern("/api/area/state/.*")))
+                .andExpect(jsonPath("$.timestamp").isNotEmpty());
 
         mvc.perform(get("/api/area/state/{geoId}/history", UUID.randomUUID())
                         .queryParam("category", "housing.home_value")
                         .accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value("NOT_FOUND"))
+                .andExpect(jsonPath("$.message").isNotEmpty())
+                .andExpect(jsonPath("$.path").value(org.hamcrest.Matchers.matchesPattern("/api/area/state/.*/history")))
+                .andExpect(jsonPath("$.timestamp").isNotEmpty());
 
         mvc.perform(get("/api/area/state/{geoId}/children", UUID.randomUUID()).accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value("NOT_FOUND"))
+                .andExpect(jsonPath("$.message").isNotEmpty())
+                .andExpect(jsonPath("$.path").value(org.hamcrest.Matchers.matchesPattern("/api/area/state/.*/children")))
+                .andExpect(jsonPath("$.timestamp").isNotEmpty());
     }
 
     @Test
-    void areaEndpointsReturn400ForInvalidInputs() throws Exception {
+    void areaEndpointsReturnStructured400ForInvalidInputs() throws Exception {
         mvc.perform(get("/api/area/not-a-level/{geoId}", "48").accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value("VALIDATION_ERROR"));
+                .andExpect(jsonPath("$.status").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.message").isNotEmpty())
+                .andExpect(jsonPath("$.path").value("/api/area/not-a-level/48"))
+                .andExpect(jsonPath("$.timestamp").isNotEmpty());
 
         mvc.perform(get("/api/area/state/{geoId}/history", "48")
                         .queryParam("category", "housing.home_value")
                         .queryParam("periods", "0")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value("VALIDATION_ERROR"));
+                .andExpect(jsonPath("$.status").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.message").isNotEmpty())
+                .andExpect(jsonPath("$.path").value("/api/area/state/48/history"))
+                .andExpect(jsonPath("$.timestamp").isNotEmpty());
     }
 
     @Test
@@ -173,46 +195,95 @@ class AreaApiControllerIntegrationTest {
     }
 
     @Test
-    void searchEndpointReturns400ForBlankQuery() throws Exception {
+    void searchEndpointReturnsStructured400ForBlankQuery() throws Exception {
         mvc.perform(get("/api/area/search")
                         .queryParam("q", "   ")
                         .queryParam("level", "county")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value("VALIDATION_ERROR"))
-                .andExpect(jsonPath("$.path").value("/api/area/search"));
+                .andExpect(jsonPath("$.message").isNotEmpty())
+                .andExpect(jsonPath("$.path").value("/api/area/search"))
+                .andExpect(jsonPath("$.timestamp").isNotEmpty());
     }
 
     @Test
-    void searchEndpointReturns400ForSingleCharacterQuery() throws Exception {
+    void searchEndpointReturnsStructured400ForSingleCharacterQuery() throws Exception {
         mvc.perform(get("/api/area/search")
                         .queryParam("q", "H")
                         .queryParam("level", "county")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value("VALIDATION_ERROR"))
-                .andExpect(jsonPath("$.path").value("/api/area/search"));
+                .andExpect(jsonPath("$.message").isNotEmpty())
+                .andExpect(jsonPath("$.path").value("/api/area/search"))
+                .andExpect(jsonPath("$.timestamp").isNotEmpty());
     }
 
     @Test
-    void searchEndpointReturns400ForUnsupportedLevel() throws Exception {
+    void searchEndpointReturnsStructured400ForUnsupportedLevel() throws Exception {
         mvc.perform(get("/api/area/search")
                         .queryParam("q", "Harris")
                         .queryParam("level", "neighborhood")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value("VALIDATION_ERROR"))
-                .andExpect(jsonPath("$.path").value("/api/area/search"));
+                .andExpect(jsonPath("$.message").isNotEmpty())
+                .andExpect(jsonPath("$.path").value("/api/area/search"))
+                .andExpect(jsonPath("$.timestamp").isNotEmpty());
     }
 
     @Test
-    void publicCorsPreflightAllowsConfiguredOrigin() throws Exception {
-        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options("/api/area/search")
+    void publicCorsPreflightAllowsProductionOrigin() throws Exception {
+        mvc.perform(options("/api/area/search")
                         .header("Origin", "https://aboutmyarea.net")
                         .header("Access-Control-Request-Method", "GET"))
                 .andExpect(status().isOk())
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
-                        .string("Access-Control-Allow-Origin", "https://aboutmyarea.net"));
+                .andExpect(header().string("Access-Control-Allow-Origin", "https://aboutmyarea.net"));
+    }
+
+    @Test
+    void publicCorsPreflightAllowsStagingOrigin() throws Exception {
+        mvc.perform(options("/api/area/search")
+                        .header("Origin", "https://staging.aboutmyarea.net")
+                        .header("Access-Control-Request-Method", "GET"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "https://staging.aboutmyarea.net"));
+    }
+
+    @Test
+    void publicCorsPreflightAllowsLocalOrigin() throws Exception {
+        mvc.perform(options("/api/area/search")
+                        .header("Origin", "http://localhost:3000")
+                        .header("Access-Control-Request-Method", "GET"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:3000"));
+    }
+
+    private UUID insertState(String fipsCode, String name) {
+        UUID geoId = UUID.randomUUID();
+        jdbc.update(
+                """
+                insert into fdp_geo.geo_areas
+                    (geo_id, geo_level, fips_code, name, parent_geo_id, display_label)
+                values (?, 'state', ?, ?, null, ?)
+                """,
+                geoId, fipsCode, name, name
+        );
+        return geoId;
+    }
+
+    private UUID insertCounty(String fipsCode, String name, UUID stateGeoId) {
+        UUID geoId = UUID.randomUUID();
+        jdbc.update(
+                """
+                insert into fdp_geo.geo_areas
+                    (geo_id, geo_level, fips_code, name, parent_geo_id, display_label)
+                values (?, 'county', ?, ?, ?, ?)
+                """,
+                geoId, fipsCode, name, stateGeoId, name + " County"
+        );
+        return geoId;
     }
 
     private void insertSnapshot(UUID geoId, String category, String source, LocalDate period, Map<String, Object> payload) throws Exception {
