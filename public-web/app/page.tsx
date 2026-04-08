@@ -1,41 +1,81 @@
-import { getMapTiles } from "@/lib/api";
+// public-web/app/page.tsx
+import type { Metadata } from "next";
+import Link from "next/link";
 
-export default async function HomePage() {
-  let stateCount: number | null = null;
-  let apiStatus = "Connected";
+export const metadata: Metadata = {
+  title: "aboutmyarea.net",
+  description: "Public web foundation for the aboutmyarea.net consumer product.",
+};
 
-  try {
-    const tiles = await getMapTiles("state", "-180,-90,180,90");
-    stateCount = tiles.features.length;
-  } catch (error) {
-    apiStatus = "Unavailable";
-    console.error(error);
-  }
+const EXAMPLE_ROUTES = [
+  {
+    label: "State",
+    title: "Texas state detail",
+    path: "/area/state/48",
+    desc: "Canonical area detail route for a state.",
+  },
+  {
+    label: "County",
+    title: "Harris County, TX",
+    path: "/area/county/48201",
+    desc: "Canonical area detail route for a county.",
+  },
+  {
+    label: "Metro",
+    title: "Houston metro",
+    path: "/area/metro/26420",
+    desc: "Canonical area detail route for a CBSA / metro.",
+  },
+  {
+    label: "ZIP",
+    title: "ZIP 77002",
+    path: "/area/zip/77002",
+    desc: "Canonical area detail route for a ZIP code.",
+  },
+  {
+    label: "Browse",
+    title: "Browse Texas",
+    path: "/browse/48",
+    desc: "Crawlable state browse entry route.",
+  },
+  {
+    label: "Compare",
+    title: "County comparison",
+    path: "/compare?level=county&ids=48201,06037",
+    desc: "Public compare route scaffold.",
+  },
+] as const;
 
+export default function HomePage() {
   return (
-    <section className="hero-card">
-      <p className="eyebrow">Sprint 6.4</p>
-      <h1>Public web scaffold is running.</h1>
+    <div className="hero-card">
+      <p className="eyebrow">aboutmyarea.net · Public Beta Foundation</p>
+      <h1>Explore your area</h1>
       <p className="lead">
-        This page is intentionally minimal. Its job is to prove that the new
-        Next.js app can run independently and talk to the existing backend
-        through NEXT_PUBLIC_API_BASE_URL.
+        This public-web scaffold establishes the shared shell, route structure,
+        and typed API client for the aboutmyarea.net public product.
       </p>
 
-      <div className="status-grid">
-        <div className="status-item">
-          <span className="label">App</span>
-          <strong>public-web</strong>
-        </div>
-        <div className="status-item">
-          <span className="label">API status</span>
-          <strong>{apiStatus}</strong>
-        </div>
-        <div className="status-item">
-          <span className="label">State tile count</span>
-          <strong>{stateCount ?? "n/a"}</strong>
-        </div>
+      <div className="hero-actions">
+        <Link href="/browse" className="stub-link">
+          Browse all states
+        </Link>
+        <Link href="/compare" className="stub-link">
+          Compare areas
+        </Link>
       </div>
-    </section>
+
+      <p className="section-eyebrow">Representative public routes</p>
+      <div className="route-grid">
+        {EXAMPLE_ROUTES.map((route) => (
+          <Link key={route.path} href={route.path} className="route-card">
+            <span className="route-card-label">{route.label}</span>
+            <span className="route-card-title">{route.title}</span>
+            <span className="route-card-path">{route.path}</span>
+            <span className="route-card-desc">{route.desc}</span>
+          </Link>
+        ))}
+      </div>
+    </div>
   );
 }

@@ -1,16 +1,38 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+// public-web/lib/api.ts
+import type { GeoLevel } from "@/lib/route-contract";
 
-if (!API_BASE_URL) {
-  throw new Error("NEXT_PUBLIC_API_BASE_URL is required");
+// ─── Base URL ────────────────────────────────────────────────────────────────
+
+function getApiBaseUrl(): string {
+  const value = process.env.NEXT_PUBLIC_API_BASE_URL;
+
+  if (!value) {
+    throw new Error(
+      "NEXT_PUBLIC_API_BASE_URL is required. Add it to public-web/.env.local."
+    );
+  }
+
+  return value.replace(/\/$/, "");
 }
 
-export type GeoLevel = "national" | "state" | "metro" | "county" | "city" | "zip";
+// ─── Geo-level types by usage ────────────────────────────────────────────────
+
+export type AreaDetailGeoLevel = "state" | "county" | "metro" | "zip";
+export type MapTileGeoLevel = "state" | "county" | "metro" | "zip";
+
+// ─── DTOs ────────────────────────────────────────────────────────────────────
 
 export interface AreaParent {
   geoId: string;
-  geoLevel: string;
+  geoLevel: GeoLevel;
   name: string;
   displayLabel: string;
+}
+
+export interface AreaSnapshotChange {
+  pctChange?: number;
+  direction?: string;
+  magnitude?: string;
 }
 
 export interface AreaSnapshot {
@@ -19,16 +41,12 @@ export interface AreaSnapshot {
   source: string;
   isRollup: boolean;
   payload: Record<string, unknown>;
-  change: {
-    pctChange?: number;
-    direction?: string;
-    magnitude?: string;
-  } | null;
+  change: AreaSnapshotChange | null;
 }
 
 export interface AreaResponse {
   geoId: string;
-  geoLevel: string;
+  geoLevel: GeoLevel;
   name: string;
   displayLabel: string;
   fipsCode: string | null;
@@ -47,7 +65,7 @@ export interface HistoryPoint {
 
 export interface HistoryResponse {
   geoId: string;
-  geoLevel: string;
+  geoLevel: GeoLevel;
   category: string;
   periodsRequested: number;
   points: HistoryPoint[];
@@ -55,7 +73,7 @@ export interface HistoryResponse {
 
 export interface ChildArea {
   geoId: string;
-  geoLevel: string;
+  geoLevel: GeoLevel;
   name: string;
   displayLabel: string;
   coverageCount: number;
@@ -63,14 +81,14 @@ export interface ChildArea {
 
 export interface ChildrenResponse {
   geoId: string;
-  geoLevel: string;
-  childGeoLevel: string;
+  geoLevel: GeoLevel;
+  childGeoLevel: GeoLevel;
   children: ChildArea[];
 }
 
 export interface AreaSearchResult {
   geoId: string;
-  geoLevel: string;
+  geoLevel: GeoLevel;
   name: string;
   displayLabel: string;
   fipsCode: string | null;
@@ -80,14 +98,23 @@ export interface AreaSearchResult {
 
 export interface AreaSearchResponse {
   query: string;
-  level: string;
+  level: GeoLevel;
   results: AreaSearchResult[];
+}
+
+// ─── Map tile types ───────────────────────────────────────────────────────────
+
+export interface GeoTileProperties {
+  boundaryKey: string;
+  boundaryKind: string;
+  displayLabel: string;
+  [key: string]: unknown;
 }
 
 export interface GeoJsonFeature {
   type: "Feature";
   geometry: unknown | null;
-  properties: Record<string, unknown>;
+  properties: GeoTileProperties;
 }
 
 export interface GeoJsonFeatureCollection {
@@ -95,38 +122,195 @@ export interface GeoJsonFeatureCollection {
   features: GeoJsonFeature[];
 }
 
+// ─── Public error contract ───────────────────────────────────────────────────
+
+export type PublicApiStatus =
+  | "VALIDATION_ERROR"
+  | "NOT_FOUND"
+  | "LOCKED"
+  | "API_ERROR"
+  | "DB_ERROR"
+  | "UNCLASSIFIED";
+
+export interface PublicApiErrorResponse {
+  status: PublicApiStatus;
+  message: string;
+  path: string;
+  timestamp: string;
+}
+
+export class PublicApiError extends Error {
+  readonly httpStatus: number;
+  readonly apiStatus: PublicApiStatus | null;
+  readonly path: string;
+  readonly timestamp: string | null;
+  readonly raw: string;
+
+  constructor(args: {
+    httpStatus: number;
+    message: string;
+    apiStatus: PublicApiStatus | null;
+    path: string;
+    timestamp: string | null;
+    raw: string;
+  }) {
+    super(args.message);
+    this.name = "PublicApiError";
+    this.httpStatus = args.httpStatus;
+    this.apiStatus = args.apiStatus;
+    this.path = args.path;
+    this.timestamp = args.timestamp;
+    this.raw = args.raw;
+  }
+
+  get isNotFound(): boolean {
+    return this.httpStatus === 404 || this.apiStatus === "NOT_FOUND";
+  }
+
+  get isValidationError(): boolean {
+    return (
+      this.httpStatus === 400 || this.apiStatus === "VALIDATION_ERROR"
+    );
+  }
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isPublicApiErrorResponse(
+  value: unknown
+): value is PublicApiErrorResponse {
+  if (!isObject(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.status === "string" &&
+    typeof value.message === "string" &&
+    typeof value.path === "string" &&
+    typeof value.timestamp === "string"
+  );
+}
+
+// ─── Core fetch helper ────────────────────────────────────────────────────────
+
 async function apiGet<T>(path: string): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: { Accept: "application/json" },
+  const baseUrl = getApiBaseUrl();
+  const url = `${baseUrl}${path}`;
+
+  const response = await fetch(url, {
+    headers: {
+      Accept: "application/json",
+    },
     cache: "no-store",
   });
 
   if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`API request failed: ${response.status} ${response.statusText} - ${text}`);
+    const raw = await response.text();
+    const contentType = response.headers.get("content-type") ?? "";
+
+    if (contentType.includes("application/json")) {
+      try {
+        const parsed: unknown = JSON.parse(raw);
+
+        if (isPublicApiErrorResponse(parsed)) {
+          throw new PublicApiError({
+            httpStatus: response.status,
+            message: parsed.message,
+            apiStatus: parsed.status,
+            path: parsed.path,
+            timestamp: parsed.timestamp,
+            raw,
+          });
+        }
+      } catch (error) {
+        if (error instanceof PublicApiError) {
+          throw error;
+        }
+      }
+    }
+
+    throw new PublicApiError({
+      httpStatus: response.status,
+      message: response.statusText || "API request failed",
+      apiStatus: null,
+      path,
+      timestamp: null,
+      raw,
+    });
   }
 
   return response.json() as Promise<T>;
 }
 
-export function getArea(geoLevel: string, identifier: string) {
+// ─── Public endpoint methods ──────────────────────────────────────────────────
+
+/**
+ * GET /api/area/{geoLevel}/{identifier}
+ */
+export function getArea(
+  geoLevel: AreaDetailGeoLevel,
+  identifier: string
+): Promise<AreaResponse> {
   return apiGet<AreaResponse>(`/api/area/${geoLevel}/${identifier}`);
 }
 
-export function getAreaHistory(geoLevel: string, identifier: string, category: string, periods = 12) {
-  const params = new URLSearchParams({ category, periods: String(periods) });
-  return apiGet<HistoryResponse>(`/api/area/${geoLevel}/${identifier}/history?${params.toString()}`);
+/**
+ * GET /api/area/{geoLevel}/{identifier}/history?category=...&periods=...
+ */
+export function getAreaHistory(
+  geoLevel: AreaDetailGeoLevel,
+  identifier: string,
+  category: string,
+  periods = 12
+): Promise<HistoryResponse> {
+  const params = new URLSearchParams({
+    category,
+    periods: String(periods),
+  });
+
+  return apiGet<HistoryResponse>(
+    `/api/area/${geoLevel}/${identifier}/history?${params.toString()}`
+  );
 }
 
-export function getAreaChildren(geoLevel: string, identifier: string) {
-  return apiGet<ChildrenResponse>(`/api/area/${geoLevel}/${identifier}/children`);
+/**
+ * GET /api/area/{geoLevel}/{identifier}/children
+ */
+export function getAreaChildren(
+  geoLevel: AreaDetailGeoLevel,
+  identifier: string
+): Promise<ChildrenResponse> {
+  return apiGet<ChildrenResponse>(
+    `/api/area/${geoLevel}/${identifier}/children`
+  );
 }
 
-export function searchAreas(query: string, level: string) {
-  const params = new URLSearchParams({ q: query, level });
+/**
+ * GET /api/area/search?q=...&level=...
+ */
+export function searchAreas(
+  query: string,
+  level: GeoLevel
+): Promise<AreaSearchResponse> {
+  const params = new URLSearchParams({
+    q: query,
+    level,
+  });
+
   return apiGet<AreaSearchResponse>(`/api/area/search?${params.toString()}`);
 }
 
-export function getMapTiles(geoLevel: "state" | "county" | "metro" | "city" | "zip", bbox: string) {
-  return apiGet<GeoJsonFeatureCollection>(`/api/map/tiles/${geoLevel}?bbox=${encodeURIComponent(bbox)}`);
+/**
+ * GET /api/map/tiles/{geoLevel}?bbox=...
+ */
+export function getMapTiles(
+  geoLevel: MapTileGeoLevel,
+  bbox: string
+): Promise<GeoJsonFeatureCollection> {
+  const params = new URLSearchParams({ bbox });
+  return apiGet<GeoJsonFeatureCollection>(
+    `/api/map/tiles/${geoLevel}?${params.toString()}`
+  );
 }
