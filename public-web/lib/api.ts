@@ -1,5 +1,14 @@
 // public-web/lib/api.ts
-import type { GeoLevel } from "@/lib/route-contract";
+import type {
+  AreaDetailGeoLevel,
+  GeoLevel,
+  MapTileGeoLevel,
+} from "@/lib/route-contract";
+export type {
+  AreaDetailGeoLevel,
+  GeoLevel,
+  MapTileGeoLevel,
+} from "@/lib/route-contract";
 
 // ─── Base URL ────────────────────────────────────────────────────────────────
 
@@ -17,8 +26,11 @@ function getApiBaseUrl(): string {
 
 // ─── Geo-level types by usage ────────────────────────────────────────────────
 
-export type AreaDetailGeoLevel = "state" | "county" | "metro" | "zip";
-export type MapTileGeoLevel = "state" | "county" | "metro" | "zip";
+/**
+ * Stable national geo_id seeded by V11__fdp_geo_hierarchy_schema.sql.
+ * Used by the homepage summary panel on default load.
+ */
+export const NATIONAL_GEO_ID = "00000000-0000-0000-0000-000000000000";
 
 // ─── DTOs ────────────────────────────────────────────────────────────────────
 
@@ -245,6 +257,15 @@ async function apiGet<T>(path: string): Promise<T> {
 }
 
 // ─── Public endpoint methods ──────────────────────────────────────────────────
+
+/**
+ * GET /api/area/national/{nationalGeoId}
+ *
+ * Story 7.2 uses the migration-seeded national row for the default summary panel.
+ */
+export function getNationalArea(): Promise<AreaResponse> {
+  return apiGet<AreaResponse>(`/api/area/national/${NATIONAL_GEO_ID}`);
+}
 
 /**
  * GET /api/area/{geoLevel}/{identifier}
