@@ -1,32 +1,51 @@
 // public-web/components/home/HomeSummaryPanel.tsx
 "use client";
 
+import Link from "next/link";
 import type { HomeTab } from "@/lib/home-query";
 import type { HomeSummaryModel } from "@/lib/home-summary";
 
 interface Props {
   tab: HomeTab;
   selectedStateFips: string | null;
+  selectedCountyFips: string | null;
+  selectedMetroCbsa: string | null;
   compareIds: string[];
   summary: HomeSummaryModel | null;
   loading: boolean;
   error: string | null;
-  onClearBrowseSelection: () => void;
+  focusedAreaHref: string | null;
+  onBackToUnitedStates: () => void;
+  onBackToState: () => void;
   onClearCompareSelections: () => void;
 }
 
 export default function HomeSummaryPanel({
   tab,
   selectedStateFips,
+  selectedCountyFips,
+  selectedMetroCbsa,
   compareIds,
   summary,
   loading,
   error,
-  onClearBrowseSelection,
+  focusedAreaHref,
+  onBackToUnitedStates,
+  onBackToState,
   onClearCompareSelections,
 }: Props) {
+  const isBrowseTab = tab === "browse";
+  const showBackToState =
+    isBrowseTab && selectedStateFips !== null &&
+    (selectedCountyFips !== null || selectedMetroCbsa !== null);
+
+  const showBackToUnitedStates =
+    isBrowseTab &&
+    selectedStateFips !== null &&
+    !showBackToState;
+
   const isShowingNational =
-    tab === "browse"
+    isBrowseTab
       ? selectedStateFips === null
       : compareIds.length === 0;
 
@@ -40,23 +59,39 @@ export default function HomeSummaryPanel({
           </h2>
           <p className="summary-subtitle">
             {isShowingNational
-              ? "National defaults shown until a state is selected."
-              : summary?.subtitle ?? "Selected-state summary"}
+              ? "National defaults remain visible until a geography is selected."
+              : summary?.subtitle ?? "Focused geography summary"}
           </p>
         </div>
 
         <div className="summary-actions">
-          {tab === "browse" && selectedStateFips ? (
+          {focusedAreaHref ? (
+            <Link href={focusedAreaHref} className="btn-secondary">
+              Open full details
+            </Link>
+          ) : null}
+
+          {showBackToState ? (
             <button
               type="button"
               className="btn-secondary"
-              onClick={onClearBrowseSelection}
+              onClick={onBackToState}
             >
-              Clear state
+              Back to State
             </button>
           ) : null}
 
-          {tab === "compare" && compareIds.length > 0 ? (
+          {showBackToUnitedStates ? (
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={onBackToUnitedStates}
+            >
+              Back to U.S.
+            </button>
+          ) : null}
+
+          {!isBrowseTab && compareIds.length > 0 ? (
             <button
               type="button"
               className="btn-secondary"
@@ -79,7 +114,8 @@ export default function HomeSummaryPanel({
               <span className="summary-card-label">{metric.label}</span>
               <strong className="summary-card-value">{metric.valueText}</strong>
               <span className="summary-card-detail">
-                {metric.detailText ?? (metric.available ? "" : "No snapshot available")}
+                {metric.detailText ??
+                  (metric.available ? "" : "No snapshot available")}
               </span>
             </article>
           ))}

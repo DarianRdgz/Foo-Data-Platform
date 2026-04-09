@@ -158,6 +158,21 @@ const SUMMARY_CONFIG: MetricConfig[] = [
   },
 ];
 
+function buildSubtitle(area: AreaResponse): string {
+  switch (area.geoLevel) {
+    case "national":
+      return "National summary";
+    case "state":
+      return "Selected state summary";
+    case "county":
+      return "Selected county summary";
+    case "metro":
+      return "Selected metro summary";
+    default:
+      return "Selected area summary";
+  }
+}
+
 export function buildHomeSummary(area: AreaResponse): HomeSummaryModel {
   const snapshotByCategory = new Map(
     area.snapshots.map((snapshot) => [snapshot.category, snapshot] as const)
@@ -169,7 +184,7 @@ export function buildHomeSummary(area: AreaResponse): HomeSummaryModel {
 
   return {
     title: area.displayLabel,
-    subtitle: area.geoLevel === "national" ? "National summary" : "Selected state summary",
+    subtitle: buildSubtitle(area),
     metrics,
   };
 }

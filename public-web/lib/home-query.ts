@@ -63,17 +63,18 @@ export function normalizeHomeState(
   input: Partial<HomeUrlState>
 ): HomeUrlState {
   const tab = isHomeTab(input.tab ?? null) ? input.tab! : "browse";
-  const selectedBrowseLevel = isHomeBrowseLevel(
-    input.selectedBrowseLevel ?? null
-  )
-    ? input.selectedBrowseLevel!
-    : "state";
 
   const selectedStateFips =
     typeof input.selectedStateFips === "string" &&
     isKnownStateCode(input.selectedStateFips)
       ? input.selectedStateFips
       : null;
+
+  const selectedBrowseLevel = isHomeBrowseLevel(
+    input.selectedBrowseLevel ?? null
+  )
+    ? input.selectedBrowseLevel!
+    : "state";
 
   const compareIds = normalizeCompareIds(input.compareIds ?? []);
 
@@ -103,13 +104,6 @@ export function parseHomeUrlState(searchParams: URLSearchParams): HomeUrlState {
   });
 }
 
-/**
- * Homepage serialization rules:
- * - default state -> "/"
- * - always keep `level` explicit when any homepage state is active
- * - `state` serializes only for Browse
- * - `ids` serialize only for Compare
- */
 export function buildHomeUrl(
   state: HomeUrlState,
   pathname = "/"
@@ -118,8 +112,8 @@ export function buildHomeUrl(
 
   const isDefault =
     normalized.tab === "browse" &&
-    normalized.selectedBrowseLevel === "state" &&
     normalized.selectedStateFips === null &&
+    normalized.selectedBrowseLevel === "state" &&
     normalized.compareIds.length === 0;
 
   if (isDefault) {
@@ -127,7 +121,13 @@ export function buildHomeUrl(
   }
 
   const params = new URLSearchParams();
-  params.set("level", normalized.selectedBrowseLevel);
+
+  if (
+    normalized.selectedStateFips !== null ||
+    normalized.tab === "compare"
+  ) {
+    params.set("level", normalized.selectedBrowseLevel);
+  }
 
   if (normalized.tab === "compare") {
     params.set("tab", "compare");
@@ -177,6 +177,45 @@ export function switchHomeTab(
     ...normalized,
     tab: "browse",
     selectedStateFips: promotedState,
+  });
+}
+
+export function selectBrowseState(
+  state: HomeUrlState,
+  stateFips: string
+): HomeUrlState {
+  const normalized = normalizeHomeState(state);
+
+  if (!isKnownStateCode(stateFips)) {
+    return normalized;
+  }
+
+  return normalizeHomeState({
+    ...normalized,
+    tab: "browse",
+    selectedStateFips: stateFips,
+    selectedBrowseLevel: "state",
+  });
+}
+
+export function setBrowseLevel(
+  state: HomeUrlState,
+  nextLevel: Extract<HomeBrowseLevel, "state" | "county" | "metro">
+): HomeUrlState {
+  const normalized = normalizeHomeState(state);
+
+  return normalizeHomeState({
+    ...normalized,
+    selectedBrowseLevel: nextLevel,
+  });
+}
+
+export function clearBrowseStateFocus(state: HomeUrlState): HomeUrlState {
+  return normalizeHomeState({
+    ...state,
+    tab: "browse",
+    selectedStateFips: null,
+    selectedBrowseLevel: "state",
   });
 }
 

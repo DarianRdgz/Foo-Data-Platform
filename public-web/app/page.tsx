@@ -1,5 +1,6 @@
 // public-web/app/page.tsx
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import HomeClientShell from "@/components/home/HomeClientShell";
 
 export const metadata: Metadata = {
@@ -9,5 +10,9 @@ export const metadata: Metadata = {
 };
 
 export default function HomePage() {
-  return <HomeClientShell />;
+  return (
+    <Suspense fallback={<div className="map-placeholder">Loading homepage…</div>}>
+      <HomeClientShell />
+    </Suspense>
+  );
 }
