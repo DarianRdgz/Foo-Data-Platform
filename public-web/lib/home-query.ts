@@ -122,10 +122,7 @@ export function buildHomeUrl(
 
   const params = new URLSearchParams();
 
-  if (
-    normalized.selectedStateFips !== null ||
-    normalized.tab === "compare"
-  ) {
+  if (normalized.selectedBrowseLevel !== "state") {
     params.set("level", normalized.selectedBrowseLevel);
   }
 

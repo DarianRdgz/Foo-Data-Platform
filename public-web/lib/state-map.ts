@@ -348,26 +348,27 @@ export function extractMetroRegions(
     if (!cbsaCode) {
       continue;
     }
-
-    deduped.set(cbsaCode, {
-      cbsaCode,
-      name:
-        typeof feature.properties.name === "string"
-          ? feature.properties.name
-          : cbsaCode,
-      displayLabel:
-        typeof feature.properties.displayLabel === "string"
-          ? feature.properties.displayLabel
-          : cbsaCode,
-      centroidLatitude: toFiniteNumber(feature.properties.centroidLatitude),
-      centroidLongitude: toFiniteNumber(feature.properties.centroidLongitude),
-      categoryCount: toFiniteNumber(feature.properties.categoryCount) ?? 0,
-      riskTier:
-        typeof feature.properties.riskTier === "string"
-          ? feature.properties.riskTier
-          : null,
-      riskScore: toFiniteNumber(feature.properties.riskScore),
-    });
+    if (!deduped.has(cbsaCode)) {
+      deduped.set(cbsaCode, {
+        cbsaCode,
+        name:
+          typeof feature.properties.name === "string"
+            ? feature.properties.name
+            : cbsaCode,
+        displayLabel:
+          typeof feature.properties.displayLabel === "string"
+            ? feature.properties.displayLabel
+            : cbsaCode,
+        centroidLatitude: toFiniteNumber(feature.properties.centroidLatitude),
+        centroidLongitude: toFiniteNumber(feature.properties.centroidLongitude),
+        categoryCount: toFiniteNumber(feature.properties.categoryCount) ?? 0,
+        riskTier:
+          typeof feature.properties.riskTier === "string"
+            ? feature.properties.riskTier
+            : null,
+        riskScore: toFiniteNumber(feature.properties.riskScore),
+      });
+    }
   }
 
   return Array.from(deduped.values()).sort((a, b) =>

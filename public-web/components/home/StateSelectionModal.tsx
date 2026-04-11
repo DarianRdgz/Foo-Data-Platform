@@ -2,6 +2,7 @@
 "use client";
 
 import type { HomeSummaryModel } from "@/lib/home-summary";
+import { useEffect, useRef } from "react";
 
 interface Props {
   isOpen: boolean;
@@ -18,6 +19,14 @@ export default function StateSelectionModal({
   onClose,
   onEnterCountyView,
 }: Props) {
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      closeButtonRef.current?.focus();
+    }
+  }, [isOpen]);
+
   if (!isOpen || !stateName) {
     return null;
   }
@@ -25,7 +34,16 @@ export default function StateSelectionModal({
   const quickFacts = summary?.metrics.slice(0, 3) ?? [];
 
   return (
-    <div className="state-modal-backdrop" role="presentation" onClick={onClose}>
+    <div
+      className="state-modal-backdrop"
+      role="presentation"
+      onClick={onClose}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") {
+          onClose();
+        }
+      }}
+    >
       <div
         className="state-modal"
         role="dialog"
@@ -43,6 +61,7 @@ export default function StateSelectionModal({
           </div>
 
           <button
+            ref={closeButtonRef}
             type="button"
             className="state-modal-close"
             aria-label="Close state quick view"

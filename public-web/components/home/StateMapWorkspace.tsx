@@ -37,7 +37,7 @@ interface Props {
     nextLevel: Extract<HomeBrowseLevel, "state" | "county" | "metro">
   ) => void;
   onBackToUnitedStates: () => void;
-  onBackToStateView: () => void;
+  onBackToState: () => void;
   onCompareToggle: (stateFips: string) => void;
 }
 
@@ -88,7 +88,7 @@ export default function StateMapWorkspace({
   onBrowseSelectMetro,
   onBrowseLevelChange,
   onBackToUnitedStates,
-  onBackToStateView,
+  onBackToState,
   onCompareToggle,
 }: Props) {
   const [stateBoundaries, setStateBoundaries] = useState<StateBoundaryFeature[]>(
@@ -103,9 +103,12 @@ export default function StateMapWorkspace({
   );
 
   const [nationalLoading, setNationalLoading] = useState(true);
-  const [drilldownLoading, setDrilldownLoading] = useState(false);
+  const [countyLoading, setCountyLoading] = useState(false);
+  const [metroLoading, setMetroLoading] = useState(false);
   const [nationalError, setNationalError] = useState<string | null>(null);
   const [drilldownError, setDrilldownError] = useState<string | null>(null);
+
+  const drilldownLoading = countyLoading || metroLoading;
 
   const stateName = selectedStateFips
     ? getStateByCode(selectedStateFips)?.name ?? selectedStateFips
@@ -180,7 +183,7 @@ export default function StateMapWorkspace({
         return;
       }
 
-      setDrilldownLoading(true);
+      setCountyLoading(true);
       setDrilldownError(null);
 
       try {
@@ -216,7 +219,7 @@ export default function StateMapWorkspace({
         }
       } finally {
         if (!cancelled) {
-          setDrilldownLoading(false);
+          setCountyLoading(false);
         }
       }
     }
@@ -249,7 +252,7 @@ export default function StateMapWorkspace({
         return;
       }
 
-      setDrilldownLoading(true);
+      setMetroLoading(true);
       setDrilldownError(null);
 
       try {
@@ -278,7 +281,7 @@ export default function StateMapWorkspace({
         }
       } finally {
         if (!cancelled) {
-          setDrilldownLoading(false);
+          setMetroLoading(false);
         }
       }
     }
@@ -330,6 +333,29 @@ export default function StateMapWorkspace({
       .filter((region) => region.pathD.length > 0);
   }, [stateRegions]);
 
+  const countyProjection = useMemo(() => {
+    if (!selectedStateBoundary || !selectedStateFips) {
+      return null;
+    }
+
+    const countyRegions = countyCache[selectedStateFips] ?? [];
+    if (countyRegions.length === 0) {
+      return null;
+    }
+
+    const featureCollection = {
+      type: "FeatureCollection",
+      features: countyRegions.map((region) => ({
+        type: "Feature",
+        id: region.fips,
+        properties: { name: region.name },
+        geometry: region.geometry,
+      })),
+    } as const;
+
+    return geoAlbersUsa().fitSize([960, 600], featureCollection as never);
+  }, [selectedStateBoundary, selectedStateFips, countyCache]);
+
   const renderedCountyView = useMemo(() => {
     if (!selectedStateBoundary || !selectedStateFips) {
       return null;
@@ -352,7 +378,11 @@ export default function StateMapWorkspace({
       })),
     } as const;
 
-    const projection = geoAlbersUsa().fitSize([960, 600], featureCollection as never);
+    if (!countyProjection) {
+      return null;
+    }
+
+    const projection = countyProjection;
     const pathBuilder = geoPath(projection);
 
     const counties: RenderCountyRegion[] = countyRegions
@@ -486,7 +516,7 @@ export default function StateMapWorkspace({
             <button
               type="button"
               className="btn-secondary"
-              onClick={onBackToStateView}
+              onClick={onBackToState}
             >
               Back to State
             </button>
@@ -693,7 +723,7 @@ export default function StateMapWorkspace({
             <button type="button" className="btn-secondary" onClick={onBackToUnitedStates}>
               Back to U.S.
             </button>
-            <button type="button" className="btn-secondary" onClick={onBackToStateView}>
+            <button type="button" className="btn-secondary" onClick={onBackToState}>
               Back to State
             </button>
           </div>

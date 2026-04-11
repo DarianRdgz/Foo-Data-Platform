@@ -1,7 +1,7 @@
 // public-web/components/home/HomeClientShell.tsx
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { getArea, getNationalArea, type AreaResponse } from "@/lib/api";
 import {
@@ -41,12 +41,11 @@ export default function HomeClientShell() {
   const [selectedMetroCbsa, setSelectedMetroCbsa] = useState<string | null>(null);
   const [isStateModalOpen, setIsStateModalOpen] = useState(false);
 
-  const [summaryCache, setSummaryCache] = useState<Record<string, AreaResponse>>(
-    {}
-  );
+  const summaryCacheRef = useRef<Record<string, AreaResponse>>({});
+  const [, forceSummaryRefresh] = useReducer((n: number) => n + 1, 0);
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [summaryError, setSummaryError] = useState<string | null>(null);
-
+    
   useEffect(() => {
     setHomeState(parsedUrlState);
   }, [parsedUrlState]);
@@ -156,11 +155,13 @@ export default function HomeClientShell() {
     selectedMetroCbsa,
   ]);
 
+  const summaryKey = summaryTarget.key;
+
   useEffect(() => {
     let cancelled = false;
 
     async function loadSummary() {
-      if (summaryCache[summaryTarget.key]) {
+      if (summaryCacheRef.current[summaryKey]) {
         setSummaryLoading(false);
         setSummaryError(null);
         return;
@@ -176,10 +177,8 @@ export default function HomeClientShell() {
             : await getArea(summaryTarget.geoLevel, String(summaryTarget.identifier));
 
         if (!cancelled) {
-          setSummaryCache((prev) => ({
-            ...prev,
-            [summaryTarget.key]: area,
-          }));
+          summaryCacheRef.current[summaryKey] = area;
+          forceSummaryRefresh();
         }
       } catch (cause) {
         if (!cancelled) {
@@ -201,9 +200,9 @@ export default function HomeClientShell() {
     return () => {
       cancelled = true;
     };
-  }, [summaryCache, summaryTarget]);
+  }, [summaryKey, summaryTarget.geoLevel, summaryTarget.identifier]);
 
-  const summaryArea = summaryCache[summaryTarget.key] ?? null;
+  const summaryArea = summaryCacheRef.current[summaryKey] ?? null;
   const summary = useMemo(
     () => (summaryArea ? buildHomeSummary(summaryArea) : null),
     [summaryArea]
@@ -359,7 +358,7 @@ export default function HomeClientShell() {
 
           applyState((prev) => clearBrowseStateFocus(prev));
         }}
-        onBackToStateView={() => {
+        onBackToState={() => {
           setSelectedCountyFips(null);
           setSelectedMetroCbsa(null);
 
