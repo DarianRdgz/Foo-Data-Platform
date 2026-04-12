@@ -84,22 +84,20 @@ export default function HomeClientShell() {
 
   const applyState = useCallback(
     (updater: (prev: HomeUrlState) => HomeUrlState) => {
-      setHomeState((prev) => {
-        const next = updater(prev);
-        const nextUrl = buildHomeUrl(next, pathname);
-
-        const currentQuery = searchParams.toString();
-        const currentUrl = currentQuery ? `${pathname}?${currentQuery}` : pathname;
-
-        if (nextUrl !== currentUrl) {
-          router.replace(nextUrl, { scroll: false });
-        }
-
-        return next;
-      });
+      setHomeState((prev) => updater(prev));
     },
-    [pathname, router, searchParams]
+    []
   );
+
+  useEffect(() => {
+    const nextUrl = buildHomeUrl(homeState, pathname);
+    const currentQuery = searchParams.toString();
+    const currentUrl = currentQuery ? `${pathname}?${currentQuery}` : pathname;
+
+    if (nextUrl !== currentUrl) {
+      router.replace(nextUrl, { scroll: false });
+    }
+  }, [homeState, pathname, router, searchParams]);
 
   const summaryTarget = useMemo<SummaryTarget>(() => {
     if (homeState.tab === "browse") {
