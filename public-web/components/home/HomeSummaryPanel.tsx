@@ -1,7 +1,8 @@
-// public-web/components/home/HomeSummaryPanel.tsx
 "use client";
 
 import Link from "next/link";
+import type { ComparableGeoLevel } from "@/lib/compare-validation";
+import { MAX_COMPARE_IDS } from "@/lib/compare-validation";
 import type { HomeTab } from "@/lib/home-query";
 import type { HomeSummaryModel } from "@/lib/home-summary";
 
@@ -11,6 +12,7 @@ interface Props {
   selectedCountyFips: string | null;
   selectedMetroCbsa: string | null;
   compareIds: string[];
+  compareLevel?: ComparableGeoLevel;
   summary: HomeSummaryModel | null;
   loading: boolean;
   error: string | null;
@@ -18,6 +20,7 @@ interface Props {
   onBackToUnitedStates: () => void;
   onBackToState: () => void;
   onClearCompareSelections: () => void;
+  onAddToCompare?: (id: string, level: ComparableGeoLevel) => void;
 }
 
 export default function HomeSummaryPanel({
@@ -26,6 +29,7 @@ export default function HomeSummaryPanel({
   selectedCountyFips,
   selectedMetroCbsa,
   compareIds,
+  compareLevel,
   summary,
   loading,
   error,
@@ -33,10 +37,13 @@ export default function HomeSummaryPanel({
   onBackToUnitedStates,
   onBackToState,
   onClearCompareSelections,
+  onAddToCompare,
 }: Props) {
   const isBrowseTab = tab === "browse";
+
   const showBackToState =
-    isBrowseTab && selectedStateFips !== null &&
+    isBrowseTab &&
+    selectedStateFips !== null &&
     (selectedCountyFips !== null || selectedMetroCbsa !== null);
 
   const showBackToUnitedStates =
@@ -48,6 +55,28 @@ export default function HomeSummaryPanel({
     isBrowseTab
       ? selectedStateFips === null
       : compareIds.length === 0;
+
+  const focusedComparable =
+    selectedMetroCbsa !== null
+      ? { id: selectedMetroCbsa, level: "metro" as ComparableGeoLevel }
+      : selectedCountyFips !== null
+        ? { id: selectedCountyFips, level: "county" as ComparableGeoLevel }
+        : selectedStateFips !== null
+          ? { id: selectedStateFips, level: "state" as ComparableGeoLevel }
+          : null;
+
+  const alreadyInCompare =
+    focusedComparable !== null &&
+    compareIds.includes(focusedComparable.id);
+
+  const atLimit = compareIds.length >= MAX_COMPARE_IDS;
+
+  const showCompareCta =
+    isBrowseTab &&
+    focusedComparable !== null &&
+    onAddToCompare !== undefined &&
+    !atLimit &&
+    (compareLevel === undefined || focusedComparable.level === compareLevel);
 
   return (
     <section className="summary-panel" aria-labelledby="summary-panel-title">
@@ -102,6 +131,23 @@ export default function HomeSummaryPanel({
           ) : null}
         </div>
       </div>
+
+      {showCompareCta ? (
+        <div className="summary-compare-row">
+          <button
+            type="button"
+            className="summary-compare-cta"
+            onClick={() =>
+              onAddToCompare?.(focusedComparable.id, focusedComparable.level)
+            }
+            disabled={alreadyInCompare}
+          >
+            {alreadyInCompare
+              ? "Added to compare ✓"
+              : `Add ${focusedComparable.level} to compare`}
+          </button>
+        </div>
+      ) : null}
 
       {loading ? (
         <div className="summary-status">Loading summary…</div>

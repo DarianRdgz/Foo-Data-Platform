@@ -1,4 +1,6 @@
 // public-web/lib/api.ts
+import type { ComparableGeoLevel } from "@/lib/compare-validation";
+
 import type {
   AreaDetailGeoLevel,
   GeoLevel,
@@ -275,6 +277,43 @@ export function getArea(
   identifier: string
 ): Promise<AreaResponse> {
   return apiGet<AreaResponse>(`/api/area/${geoLevel}/${identifier}`);
+}
+
+export interface CompareAreaResult {
+  id: string;
+  status: "fulfilled" | "rejected";
+  area: AreaResponse | null;
+  error: string | null;
+}
+
+export async function getAreasForComparison(
+  level: ComparableGeoLevel,
+  ids: string[]
+): Promise<CompareAreaResult[]> {
+  const results = await Promise.allSettled(ids.map((id) => getArea(level, id)));
+
+  return results.map((result, index) => {
+    if (result.status === "fulfilled") {
+      return {
+        id: ids[index],
+        status: "fulfilled",
+        area: result.value,
+        error: null,
+      };
+    }
+
+    const message =
+      result.reason instanceof Error
+        ? result.reason.message
+        : "Could not load this area.";
+
+    return {
+      id: ids[index],
+      status: "rejected",
+      area: null,
+      error: message,
+    };
+  });
 }
 
 /**

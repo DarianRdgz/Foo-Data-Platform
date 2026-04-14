@@ -23,6 +23,10 @@ export type AreaDetailGeoLevel = "state" | "county" | "metro" | "zip";
  */
 export type MapTileGeoLevel = "state" | "county" | "metro" | "zip";
 
+import type { ComparableGeoLevel } from "@/lib/compare-validation";
+export type { ComparableGeoLevel };
+export { isComparableGeoLevel } from "@/lib/compare-validation";
+
 const AREA_DETAIL_LEVELS = new Set<AreaDetailGeoLevel>([
   "state",
   "county",

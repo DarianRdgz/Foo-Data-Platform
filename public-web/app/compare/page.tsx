@@ -1,56 +1,36 @@
-// public-web/app/compare/page.tsx
-import type { Metadata } from "next";
-import Link from "next/link";
+import { Suspense } from "react";
+import { ComparePageClient } from "../../components/compare/ComparePageClient";
 
-export const metadata: Metadata = {
-  title: "Compare Areas",
-  description: "Compare public beta area routes.",
-};
-
-interface Props {
-  searchParams: Promise<{ level?: string; ids?: string }>;
+interface ComparePageProps {
+  searchParams: Promise<{
+    level?: string;
+    ids?: string;
+  }>;
 }
 
-export default async function ComparePage({ searchParams }: Props) {
-  const { level, ids } = await searchParams;
+export const metadata = {
+  title: "Compare Areas — aboutmyarea.net",
+};
 
-  const parsedIds = ids
-    ? ids
-        .split(",")
-        .map((value) => value.trim())
-        .filter(Boolean)
+export default async function ComparePage({ searchParams }: ComparePageProps) {
+  const resolvedSearchParams = await searchParams;
+
+  const level = resolvedSearchParams.level ?? null;
+  const ids = resolvedSearchParams.ids
+    ? resolvedSearchParams.ids.split(",").map((v) => v.trim()).filter(Boolean)
     : [];
 
   return (
-    <div className="stub-page">
-      <p className="stub-page-eyebrow">Compare</p>
-      <h1>Compare Areas</h1>
-      <p className="stub-desc">
-        Full side-by-side comparison UI is deferred to Sprint 8. This scaffold
-        page exists so the public compare route resolves safely now.
-      </p>
-
-      <div className="stub-meta">
-        {level ? <span className="stub-badge">level: {level}</span> : null}
-        {parsedIds.length > 0 ? (
-          parsedIds.map((id) => (
-            <span key={id} className="stub-badge">
-              id: {id}
-            </span>
-          ))
-        ) : (
-          <span className="stub-badge">no params provided</span>
-        )}
+    <main className="compare-page-root">
+      <div className="compare-page-header">
+        <a href="/" className="compare-page-back">
+          ← Back to the map
+        </a>
+        <h1 className="compare-page-title">Compare Areas</h1>
       </div>
-
-      <div className="stub-links">
-        <Link href="/browse" className="stub-link">
-          Browse areas
-        </Link>
-        <Link href="/" className="stub-link">
-          ← Home
-        </Link>
-      </div>
-    </div>
+      <Suspense fallback={<div className="compare-loading">Loading…</div>}>
+        <ComparePageClient level={level} ids={ids} />
+      </Suspense>
+    </main>
   );
 }

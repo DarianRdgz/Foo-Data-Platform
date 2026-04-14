@@ -22,6 +22,7 @@ import {
   type StateBoundaryFeature,
   type StateMapRegion,
 } from "@/lib/state-map";
+import type { ComparableGeoLevel } from "@/lib/compare-validation";
 
 interface Props {
   tab: HomeTab;
@@ -38,7 +39,7 @@ interface Props {
   ) => void;
   onBackToUnitedStates: () => void;
   onBackToState: () => void;
-  onCompareToggle: (stateFips: string) => void;
+  onCompareToggle?: (id: string, level: ComparableGeoLevel) => void;
 }
 
 interface RenderStateRegion extends StateMapRegion {
@@ -115,7 +116,7 @@ export default function StateMapWorkspace({
     : null;
 
   const showNationalMap =
-    tab === "compare" || !selectedStateFips || selectedBrowseLevel === "state";
+    !selectedStateFips || selectedBrowseLevel === "state";
 
   useEffect(() => {
     let cancelled = false;
@@ -445,11 +446,29 @@ export default function StateMapWorkspace({
 
   function handleStateActivate(stateFips: string) {
     if (tab === "compare") {
-      onCompareToggle(stateFips);
+      onCompareToggle?.(stateFips, "state");
       return;
     }
 
     onBrowseSelectState(stateFips);
+  }
+
+  function handleCountyActivate(countyFips: string) {
+    if (tab === "compare") {
+      onCompareToggle?.(countyFips, "county");
+      return;
+    }
+
+    onBrowseSelectCounty(countyFips);
+  }
+
+  function handleMetroActivate(cbsaCode: string) {
+    if (tab === "compare") {
+      onCompareToggle?.(cbsaCode, "metro");
+      return;
+    }
+
+    onBrowseSelectMetro(cbsaCode);
   }
 
   return (
@@ -527,10 +546,18 @@ export default function StateMapWorkspace({
       {showNationalMap ? (
         <p className="map-note">
           {tab === "compare"
-            ? "Compare mode stays on the national state map. Click states to add or remove up to four selections."
+            ? "Compare mode is active. Click states to add or remove up to four selections."
             : selectedStateFips
-            ? "A state is selected. The summary panel has updated, and you can use the pop-up to enter county view."
-            : "Single-click a state to preview it and update the summary panel without leaving the homepage."}
+              ? "A state is selected. The summary panel has updated, and you can use the pop-up to enter county view."
+              : "Single-click a state to preview it and update the summary panel without leaving the homepage."}
+        </p>
+      ) : tab === "compare" && selectedBrowseLevel === "metro" ? (
+        <p className="map-note">
+          Compare mode is active. Click metro markers or metro chips to add or remove up to four metro selections.
+        </p>
+      ) : tab === "compare" ? (
+        <p className="map-note">
+          Compare mode is active. Click counties to add or remove up to four selections.
         </p>
       ) : selectedBrowseLevel === "metro" ? (
         <p className="map-note">
@@ -609,10 +636,15 @@ export default function StateMapWorkspace({
             >
               {renderedCountyView.counties.map((region) => {
                 const isCountySelected =
+                  tab === "browse" &&
                   selectedBrowseLevel === "county" &&
                   selectedCountyFips === region.fips;
 
+                const isCountyCompareSelected =
+                  tab === "compare" && compareIds.includes(region.fips);
+
                 const isMetroMatch =
+                  tab === "browse" &&
                   selectedBrowseLevel === "metro" &&
                   selectedMetroCbsa !== null &&
                   region.cbsaCode === selectedMetroCbsa;
@@ -620,8 +652,8 @@ export default function StateMapWorkspace({
                 const className = [
                   "county-shape",
                   !region.hasTile ? "county-shape-no-data" : "",
-                  isCountySelected ? "county-shape-selected" : "",
-                  selectedBrowseLevel === "metro" && selectedMetroCbsa
+                  isCountySelected || isCountyCompareSelected ? "county-shape-selected" : "",
+                  tab === "browse" && selectedBrowseLevel === "metro" && selectedMetroCbsa
                     ? isMetroMatch
                       ? "county-shape-metro-match"
                       : "county-shape-dim"
@@ -639,7 +671,7 @@ export default function StateMapWorkspace({
                     role={selectedBrowseLevel === "county" ? "button" : undefined}
                     onClick={() => {
                       if (selectedBrowseLevel === "county") {
-                        onBrowseSelectCounty(region.fips);
+                        handleCountyActivate(region.fips);
                       }
                     }}
                     onKeyDown={(event) => {
@@ -648,7 +680,7 @@ export default function StateMapWorkspace({
                         (event.key === "Enter" || event.key === " ")
                       ) {
                         event.preventDefault();
-                        onBrowseSelectCounty(region.fips);
+                        handleCountyActivate(region.fips);
                       }
                     }}
                   >
@@ -659,7 +691,10 @@ export default function StateMapWorkspace({
 
               {selectedBrowseLevel === "metro"
                 ? renderedCountyView.metroMarkers.map((metro) => {
-                    const isActive = metro.cbsaCode === selectedMetroCbsa;
+                    const isActive =
+                      tab === "compare"
+                        ? compareIds.includes(metro.cbsaCode)
+                        : metro.cbsaCode === selectedMetroCbsa;
 
                     return (
                       <g
@@ -670,11 +705,11 @@ export default function StateMapWorkspace({
                         transform={`translate(${metro.x}, ${metro.y})`}
                         tabIndex={0}
                         role="button"
-                        onClick={() => onBrowseSelectMetro(metro.cbsaCode)}
+                        onClick={() => handleMetroActivate(metro.cbsaCode)}
                         onKeyDown={(event) => {
                           if (event.key === "Enter" || event.key === " ") {
                             event.preventDefault();
-                            onBrowseSelectMetro(metro.cbsaCode);
+                            handleMetroActivate(metro.cbsaCode);
                           }
                         }}
                       >
@@ -693,20 +728,23 @@ export default function StateMapWorkspace({
           {selectedBrowseLevel === "metro" ? (
             renderedCountyView.metroMarkers.length > 0 ? (
               <div className="metro-strip" aria-label="Metro choices">
-                {renderedCountyView.metroMarkers.map((metro) => (
-                  <button
-                    key={metro.cbsaCode}
-                    type="button"
-                    className={`metro-chip ${
-                      selectedMetroCbsa === metro.cbsaCode
-                        ? "metro-chip-active"
-                        : ""
-                    }`}
-                    onClick={() => onBrowseSelectMetro(metro.cbsaCode)}
-                  >
-                    {metro.shortLabel}
-                  </button>
-                ))}
+                {renderedCountyView.metroMarkers.map((metro) => {
+                  const isActive =
+                    tab === "compare"
+                      ? compareIds.includes(metro.cbsaCode)
+                      : selectedMetroCbsa === metro.cbsaCode;
+
+                  return (
+                    <button
+                      key={metro.cbsaCode}
+                      type="button"
+                      className={`metro-chip ${isActive ? "metro-chip-active" : ""}`}
+                      onClick={() => handleMetroActivate(metro.cbsaCode)}
+                    >
+                      {metro.shortLabel}
+                    </button>
+                  );
+                })}
               </div>
             ) : (
               <p className="map-empty-note">

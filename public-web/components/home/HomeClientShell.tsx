@@ -1,4 +1,3 @@
-// public-web/components/home/HomeClientShell.tsx
 "use client";
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
@@ -7,6 +6,9 @@ import { getArea, getNationalArea, type AreaResponse } from "@/lib/api";
 import {
   buildHomeUrl,
   clearBrowseStateFocus,
+  deriveCompareLevelFromContext,
+  detectCompareLevelChange,
+  normalizeHomeState,
   parseHomeUrlState,
   selectBrowseState,
   setBrowseLevel,
@@ -16,10 +18,12 @@ import {
 } from "@/lib/home-query";
 import { buildHomeSummary } from "@/lib/home-summary";
 import { getStateByCode } from "@/lib/us-states";
+import type { ComparableGeoLevel } from "@/lib/compare-validation";
 import HomeTabs from "@/components/home/HomeTabs";
 import HomeSummaryPanel from "@/components/home/HomeSummaryPanel";
 import StateMapWorkspace from "@/components/home/StateMapWorkspace";
 import StateSelectionModal from "@/components/home/StateSelectionModal";
+import { ComparePanel } from "@/components/compare/ComparePanel";
 
 interface SummaryTarget {
   key: string;
@@ -40,12 +44,20 @@ export default function HomeClientShell() {
   const [selectedCountyFips, setSelectedCountyFips] = useState<string | null>(null);
   const [selectedMetroCbsa, setSelectedMetroCbsa] = useState<string | null>(null);
   const [isStateModalOpen, setIsStateModalOpen] = useState(false);
+  const [levelChangeMessage, setLevelChangeMessage] = useState<string | null>(null);
 
   const summaryCacheRef = useRef<Record<string, AreaResponse>>({});
+  const prevCompareLevelRef = useRef<ComparableGeoLevel>(
+    deriveCompareLevelFromContext(
+      parsedUrlState.selectedStateFips,
+      parsedUrlState.selectedBrowseLevel
+    )
+  );
+
   const [, forceSummaryRefresh] = useReducer((n: number) => n + 1, 0);
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [summaryError, setSummaryError] = useState<string | null>(null);
-    
+
   useEffect(() => {
     setHomeState(parsedUrlState);
   }, [parsedUrlState]);
@@ -99,32 +111,27 @@ export default function HomeClientShell() {
     }
   }, [homeState, pathname, router, searchParams]);
 
+  const compareLevel: ComparableGeoLevel = useMemo(() => {
+    return deriveCompareLevelFromContext(
+      homeState.selectedStateFips,
+      homeState.selectedBrowseLevel
+    );
+  }, [homeState.selectedStateFips, homeState.selectedBrowseLevel]);
+
+  useEffect(() => {
+    const prevLevel = prevCompareLevelRef.current;
+    const message = detectCompareLevelChange(prevLevel, compareLevel);
+
+    if (message && homeState.compareIds.length > 0) {
+      setLevelChangeMessage(message);
+      applyState((prev) => normalizeHomeState({ ...prev, compareIds: [] }));
+    }
+
+    prevCompareLevelRef.current = compareLevel;
+  }, [applyState, compareLevel, homeState.compareIds.length]);
+
   const summaryTarget = useMemo<SummaryTarget>(() => {
-    if (homeState.tab === "browse") {
-      if (selectedMetroCbsa) {
-        return {
-          key: `metro:${selectedMetroCbsa}`,
-          geoLevel: "metro",
-          identifier: selectedMetroCbsa,
-        };
-      }
-
-      if (selectedCountyFips) {
-        return {
-          key: `county:${selectedCountyFips}`,
-          geoLevel: "county",
-          identifier: selectedCountyFips,
-        };
-      }
-
-      if (homeState.selectedStateFips) {
-        return {
-          key: `state:${homeState.selectedStateFips}`,
-          geoLevel: "state",
-          identifier: homeState.selectedStateFips,
-        };
-      }
-
+    if (homeState.tab !== "browse") {
       return {
         key: "national",
         geoLevel: "national",
@@ -132,11 +139,27 @@ export default function HomeClientShell() {
       };
     }
 
-    if (homeState.compareIds[0]) {
+    if (selectedMetroCbsa) {
       return {
-        key: `state:${homeState.compareIds[0]}`,
+        key: `metro:${selectedMetroCbsa}`,
+        geoLevel: "metro",
+        identifier: selectedMetroCbsa,
+      };
+    }
+
+    if (selectedCountyFips) {
+      return {
+        key: `county:${selectedCountyFips}`,
+        geoLevel: "county",
+        identifier: selectedCountyFips,
+      };
+    }
+
+    if (homeState.selectedStateFips) {
+      return {
+        key: `state:${homeState.selectedStateFips}`,
         geoLevel: "state",
-        identifier: homeState.compareIds[0],
+        identifier: homeState.selectedStateFips,
       };
     }
 
@@ -148,7 +171,6 @@ export default function HomeClientShell() {
   }, [
     homeState.tab,
     homeState.selectedStateFips,
-    homeState.compareIds,
     selectedCountyFips,
     selectedMetroCbsa,
   ]);
@@ -156,6 +178,12 @@ export default function HomeClientShell() {
   const summaryKey = summaryTarget.key;
 
   useEffect(() => {
+    if (homeState.tab !== "browse") {
+      setSummaryLoading(false);
+      setSummaryError(null);
+      return;
+    }
+
     let cancelled = false;
 
     async function loadSummary() {
@@ -198,7 +226,7 @@ export default function HomeClientShell() {
     return () => {
       cancelled = true;
     };
-  }, [summaryKey, summaryTarget.geoLevel, summaryTarget.identifier]);
+  }, [homeState.tab, summaryKey, summaryTarget.geoLevel, summaryTarget.identifier]);
 
   const summaryArea = summaryCacheRef.current[summaryKey] ?? null;
   const summary = useMemo(
@@ -211,10 +239,19 @@ export default function HomeClientShell() {
       homeState.selectedStateFips
     : null;
 
-  const compareStateNames = homeState.compareIds.map((value) => ({
-    fips: value,
-    name: getStateByCode(value)?.name ?? value,
-  }));
+  const compareSelectionLabels = useMemo(() => {
+    if (compareLevel === "state") {
+      return homeState.compareIds.map((value) => ({
+        id: value,
+        label: getStateByCode(value)?.name ?? value,
+      }));
+    }
+
+    return homeState.compareIds.map((value) => ({
+      id: value,
+      label: value,
+    }));
+  }, [compareLevel, homeState.compareIds]);
 
   const focusedAreaHref = useMemo(() => {
     if (summaryTarget.geoLevel === "state" && summaryTarget.identifier) {
@@ -251,6 +288,7 @@ export default function HomeClientShell() {
           setSelectedCountyFips(null);
           setSelectedMetroCbsa(null);
           setIsStateModalOpen(false);
+          setLevelChangeMessage(null);
 
           applyState((prev) => switchHomeTab(prev, nextTab));
         }}
@@ -270,8 +308,8 @@ export default function HomeClientShell() {
                 {homeState.selectedBrowseLevel === "metro"
                   ? "metro overlay"
                   : homeState.selectedBrowseLevel === "county"
-                  ? "county view"
-                  : "state summary"}
+                    ? "county view"
+                    : "state summary"}
               </span>
             ) : null}
           </div>
@@ -283,25 +321,24 @@ export default function HomeClientShell() {
               <span className="toolbar-label">Compare selection</span>
 
               <div className="selection-strip">
-                {compareStateNames.length > 0 ? (
-                  compareStateNames.map((entry) => (
-                    <span key={entry.fips} className="selection-chip">
-                      {entry.name}
+                {compareSelectionLabels.length > 0 ? (
+                  compareSelectionLabels.map((entry) => (
+                    <span key={entry.id} className="selection-chip">
+                      {entry.label}
                     </span>
                   ))
                 ) : (
-                  <span className="selection-chip">No states selected yet</span>
+                  <span className="selection-chip">No areas selected yet</span>
                 )}
 
-                {compareStateNames.length > 0 ? (
+                {compareSelectionLabels.length > 0 ? (
                   <button
                     type="button"
                     className="text-link-button"
                     onClick={() => {
-                      applyState((prev) => ({
-                        ...prev,
-                        compareIds: [],
-                      }));
+                      applyState((prev) =>
+                        normalizeHomeState({ ...prev, compareIds: [] })
+                      );
                     }}
                   >
                     Clear all
@@ -362,49 +399,87 @@ export default function HomeClientShell() {
 
           applyState((prev) => setBrowseLevel(prev, "county"));
         }}
-        onCompareToggle={(stateFips) => {
-          applyState((prev) => ({
-            ...toggleCompareSelection(
+        onCompareToggle={(id, level) => {
+          setSelectedCountyFips(null);
+          setSelectedMetroCbsa(null);
+          setIsStateModalOpen(false);
+          setLevelChangeMessage(null);
+
+          applyState((prev) =>
+            toggleCompareSelection(
               {
                 ...prev,
                 tab: "compare",
               },
-              stateFips
-            ),
-          }));
+              id,
+              level
+            )
+          );
         }}
       />
 
-      <HomeSummaryPanel
-        tab={homeState.tab}
-        selectedStateFips={homeState.selectedStateFips}
-        selectedCountyFips={selectedCountyFips}
-        selectedMetroCbsa={selectedMetroCbsa}
-        compareIds={homeState.compareIds}
-        summary={summary}
-        loading={summaryLoading}
-        error={summaryError}
-        focusedAreaHref={focusedAreaHref}
-        onBackToUnitedStates={() => {
-          setSelectedCountyFips(null);
-          setSelectedMetroCbsa(null);
-          setIsStateModalOpen(false);
+      {homeState.tab === "compare" ? (
+        <section className="home-compare-section">
+          {levelChangeMessage ? (
+            <div className="compare-level-change-notice" role="status">
+              {levelChangeMessage}
+            </div>
+          ) : null}
 
-          applyState((prev) => clearBrowseStateFocus(prev));
-        }}
-        onBackToState={() => {
-          setSelectedCountyFips(null);
-          setSelectedMetroCbsa(null);
+          <ComparePanel
+            level={compareLevel}
+            ids={homeState.compareIds}
+            onRemoveId={(id) => {
+              applyState((prev) => toggleCompareSelection(prev, id, compareLevel));
+              setLevelChangeMessage(null);
+            }}
+          />
+        </section>
+      ) : (
+        <HomeSummaryPanel
+          tab={homeState.tab}
+          selectedStateFips={homeState.selectedStateFips}
+          selectedCountyFips={selectedCountyFips}
+          selectedMetroCbsa={selectedMetroCbsa}
+          compareIds={homeState.compareIds}
+          summary={summary}
+          loading={summaryLoading}
+          error={summaryError}
+          focusedAreaHref={focusedAreaHref}
+          onBackToUnitedStates={() => {
+            setSelectedCountyFips(null);
+            setSelectedMetroCbsa(null);
+            setIsStateModalOpen(false);
 
-          applyState((prev) => setBrowseLevel(prev, "county"));
+            applyState((prev) => clearBrowseStateFocus(prev));
+          }}
+          onBackToState={() => {
+            setSelectedCountyFips(null);
+            setSelectedMetroCbsa(null);
+
+            applyState((prev) => setBrowseLevel(prev, "county"));
+          }}
+          onClearCompareSelections={() => {
+            applyState((prev) =>
+              normalizeHomeState({ ...prev, compareIds: [] })
+            );
+          }}
+          onAddToCompare={(id, level) => {
+          setLevelChangeMessage(null);
+
+          applyState((prev) =>
+            toggleCompareSelection(
+              {
+                ...prev,
+                tab: "compare",
+              },
+              id,
+              level
+            )
+          );
         }}
-        onClearCompareSelections={() => {
-          applyState((prev) => ({
-            ...prev,
-            compareIds: [],
-          }));
-        }}
-      />
+        />
+      )}
 
       <StateSelectionModal
         isOpen={

@@ -1314,3 +1314,214 @@ textarea {
     flex-direction: column;
   }
 }
+
+/* ── Compare chip strip ─────────────────────────── */
+.compare-chip-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.compare-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.6rem;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.compare-chip-hint {
+  color: var(--color-text-muted);
+  font-weight: 400;
+  font-style: italic;
+  background: transparent;
+  border-style: dashed;
+}
+
+.compare-chip-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0;
+}
+
+.compare-chip-remove:hover {
+  color: var(--color-text);
+}
+
+/* ── Compare validation banner ──────────────────── */
+.compare-validation-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: var(--color-surface-raised);
+  border-left: 3px solid var(--color-accent);
+  font-size: 0.875rem;
+  color: var(--color-text);
+  margin: 0.75rem 1rem;
+  border-radius: 0.25rem;
+}
+
+.compare-return-link {
+  font-size: 0.8125rem;
+  color: var(--color-link);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.compare-level-change-notice {
+  padding: 0.5rem 1rem;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  background: var(--color-surface-raised);
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* ── Compare cards grid ─────────────────────────── */
+.compare-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.compare-card {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.compare-card--error {
+  border-color: var(--color-error, #d32f2f);
+  background: var(--color-error-surface, #fef2f2);
+}
+
+.compare-card-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.compare-card-metric {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+}
+
+.compare-card-metric-label {
+  color: var(--color-text-muted);
+}
+
+.compare-card-metric-value {
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.compare-card-detail-link {
+  margin-top: auto;
+  font-size: 0.8125rem;
+  color: var(--color-link);
+  text-decoration: none;
+}
+
+.compare-card-detail-link:hover {
+  text-decoration: underline;
+}
+
+.compare-card-error-message {
+  font-weight: 500;
+  color: var(--color-error, #d32f2f);
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.compare-card-error-detail {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+/* ── Compare empty / loading ────────────────────── */
+.compare-empty-prompt {
+  padding: 1.5rem 1rem;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+.compare-loading {
+  padding: 1.5rem 1rem;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+/* ── Summary panel compare CTA ──────────────────── */
+.summary-compare-cta {
+  display: block;
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: 0.375rem;
+  color: var(--color-link);
+  cursor: pointer;
+  text-align: center;
+}
+
+.summary-compare-cta:hover:not(:disabled) {
+  background: var(--color-surface-raised);
+}
+
+.summary-compare-cta:disabled {
+  color: var(--color-text-muted);
+  cursor: default;
+}
+
+/* ── Direct compare page ────────────────────────── */
+.compare-page-root {
+  min-height: 100vh;
+  padding: 2rem 1rem;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.compare-page-header {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.compare-page-back {
+  font-size: 0.875rem;
+  color: var(--color-link);
+  text-decoration: none;
+}
+
+.compare-page-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+}
