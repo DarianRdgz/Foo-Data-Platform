@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import { ComparePageClient } from "../../components/compare/ComparePageClient";
 
 interface ComparePageProps {
@@ -23,9 +24,9 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
   return (
     <main className="compare-page-root">
       <div className="compare-page-header">
-        <a href="/" className="compare-page-back">
+        <Link href="/" className="compare-page-back">
           ← Back to the map
-        </a>
+        </Link>
         <h1 className="compare-page-title">Compare Areas</h1>
       </div>
       <Suspense fallback={<div className="compare-loading">Loading…</div>}>

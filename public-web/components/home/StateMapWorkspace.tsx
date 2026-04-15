@@ -437,12 +437,13 @@ export default function StateMapWorkspace({
       metroMarkers,
     };
   }, [
-    selectedBrowseLevel,
-    selectedStateBoundary,
-    selectedStateFips,
-    countyCache,
-    metroCache,
-  ]);
+      selectedBrowseLevel,
+      selectedStateBoundary,
+      selectedStateFips,
+      countyCache,
+      metroCache,
+      countyProjection,
+    ]);
 
   function handleStateActivate(stateFips: string) {
     if (tab === "compare") {
