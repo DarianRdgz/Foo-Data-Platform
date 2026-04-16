@@ -209,7 +209,10 @@ function isPublicApiErrorResponse(
 
 // ─── Core fetch helper ────────────────────────────────────────────────────────
 
-async function apiGet<T>(path: string): Promise<T> {
+async function apiGet<T>(
+  path: string,
+  signal?: AbortSignal
+): Promise<T> {
   const baseUrl = getApiBaseUrl();
   const url = `${baseUrl}${path}`;
 
@@ -218,6 +221,7 @@ async function apiGet<T>(path: string): Promise<T> {
       Accept: "application/json",
     },
     cache: "no-store",
+    signal,
   });
 
   if (!response.ok) {
@@ -352,14 +356,18 @@ export function getAreaChildren(
  */
 export function searchAreas(
   query: string,
-  level: GeoLevel
+  level: GeoLevel,
+  signal?: AbortSignal
 ): Promise<AreaSearchResponse> {
   const params = new URLSearchParams({
     q: query,
     level,
   });
 
-  return apiGet<AreaSearchResponse>(`/api/area/search?${params.toString()}`);
+  return apiGet<AreaSearchResponse>(
+    `/api/area/search?${params.toString()}`,
+    signal
+  );
 }
 
 /**
