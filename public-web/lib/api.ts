@@ -91,6 +91,9 @@ export interface ChildArea {
   name: string;
   displayLabel: string;
   coverageCount: number;
+  fipsCode: string | null;
+  cbsaCode: string | null;
+  zipCode: string | null;
 }
 
 export interface ChildrenResponse {

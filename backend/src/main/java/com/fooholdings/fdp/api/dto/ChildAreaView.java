@@ -7,5 +7,8 @@ public record ChildAreaView(
         String geoLevel,
         String name,
         String displayLabel,
-        long categoryCoverageCount
+        long coverageCount,
+        String fipsCode,
+        String cbsaCode,
+        String zipCode
 ) {}
