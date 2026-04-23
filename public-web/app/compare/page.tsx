@@ -1,6 +1,6 @@
-import { Suspense } from "react";
 import Link from "next/link";
-import { ComparePageClient } from "../../components/compare/ComparePageClient";
+import { ComparePageClient } from "@/components/compare/ComparePageClient";
+import { parseDirectCompareParams } from "@/lib/compare-query";
 
 interface ComparePageProps {
   searchParams: Promise<{
@@ -14,12 +14,12 @@ export const metadata = {
 };
 
 export default async function ComparePage({ searchParams }: ComparePageProps) {
-  const resolvedSearchParams = await searchParams;
+  const params = await searchParams;
 
-  const level = resolvedSearchParams.level ?? null;
-  const ids = resolvedSearchParams.ids
-    ? resolvedSearchParams.ids.split(",").map((v) => v.trim()).filter(Boolean)
-    : [];
+  const compareState = parseDirectCompareParams({
+    level: params.level ?? null,
+    ids: params.ids ?? null,
+  });
 
   return (
     <main className="compare-page-root">
@@ -29,9 +29,11 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
         </Link>
         <h1 className="compare-page-title">Compare Areas</h1>
       </div>
-      <Suspense fallback={<div className="compare-loading">Loading…</div>}>
-        <ComparePageClient level={level} ids={ids} />
-      </Suspense>
+
+      <ComparePageClient
+        initialLevel={compareState.level}
+        initialIds={compareState.ids}
+      />
     </main>
   );
 }

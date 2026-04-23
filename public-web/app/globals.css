@@ -1608,6 +1608,68 @@ textarea {
   margin: 0;
 }
 
+/* ─── Compare card header and controls ─────────────────────────────────────── */
+
+.compare-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.compare-card-remove {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0.1rem 0.25rem;
+  border-radius: 4px;
+  transition: color 0.1s ease, background 0.1s ease;
+}
+
+.compare-card-remove:hover {
+  color: var(--color-text);
+  background: var(--color-border);
+}
+
+.compare-card-subtitle {
+  font-size: 0.78rem;
+  color: var(--color-text-subtle);
+  margin: 0 0 0.65rem;
+}
+
+.compare-share-link {
+  font-size: 0.8125rem;
+  color: var(--color-link);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.compare-share-link:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 600px) {
+  .compare-page-header {
+    flex-wrap: wrap;
+    row-gap: 0.5rem;
+  }
+
+  .compare-validation-banner {
+    flex-wrap: wrap;
+    row-gap: 0.5rem;
+  }
+
+  .compare-chip-remove {
+    min-width: 28px;
+    min-height: 28px;
+  }
+}
+
 /* ──────────────────────────────────────────────────────────
    Area detail pages — Story 7.5
    ────────────────────────────────────────────────────────── */

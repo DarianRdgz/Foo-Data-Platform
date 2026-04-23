@@ -76,26 +76,26 @@ export function ComparePanel({
   const [resolvedResults, setResolvedResults] =
     useState<ResolvedCompareResults | null>(null);
 
-  useEffect(() => {
-    if (!requestKey || !resolvedLevel) {
-      return;
-    }
-
-    let cancelled = false;
-
-    getAreasForComparison(resolvedLevel, ids).then((data) => {
-      if (!cancelled) {
-        setResolvedResults({
-          requestKey,
-          data,
-        });
+    useEffect(() => {
+      if (!requestKey || !resolvedLevel) {
+        return;
       }
-    });
 
-    return () => {
-      cancelled = true;
-    };
-  }, [requestKey, resolvedLevel, ids]);
+      const controller = new AbortController();
+
+      getAreasForComparison(resolvedLevel, ids, controller.signal).then((data) => {
+        if (!controller.signal.aborted) {
+          setResolvedResults({
+            requestKey,
+            data,
+          });
+        }
+      });
+
+      return () => {
+        controller.abort();
+      };
+    }, [requestKey, resolvedLevel, ids]);
 
   const visibleResults =
     requestKey && resolvedResults?.requestKey === requestKey
@@ -104,19 +104,38 @@ export function ComparePanel({
 
   const loading = Boolean(requestKey && visibleResults === null);
 
+  const chipLabelMap = useMemo(() => {
+    const map = new Map<string, string>();
+
+    if (visibleResults) {
+      for (const result of visibleResults) {
+        if (result.status === "fulfilled" && result.area) {
+          map.set(
+            result.id,
+            result.area.displayLabel ?? result.area.name ?? result.id
+          );
+        }
+      }
+    }
+
+    return map;
+  }, [visibleResults]);
+
   return (
     <div className="compare-panel">
       {ids.length > 0 && (
         <div className="compare-chip-strip">
           {ids.map((id) => (
             <span key={id} className="compare-chip">
-              <span className="compare-chip-label">{id}</span>
+              <span className="compare-chip-label">
+                {chipLabelMap.get(id) ?? id}
+              </span>
               {onRemoveId && (
                 <button
                   type="button"
                   className="compare-chip-remove"
                   onClick={() => onRemoveId(id)}
-                  aria-label={`Remove ${id} from comparison`}
+                  aria-label={`Remove ${chipLabelMap.get(id) ?? id} from comparison`}
                 >
                   ×
                 </button>
@@ -163,11 +182,11 @@ export function ComparePanel({
               return (
                 <div key={result.id} className="compare-card compare-card--error">
                   <p className="compare-card-error-message">
-                    Could not load area {result.id}.
+                    {result.apiStatus === "NOT_FOUND"
+                      ? "This area could not be found."
+                      : "This area could not be loaded right now."}
                   </p>
-                  <p className="compare-card-error-detail">
-                    {result.error ?? "Unknown error."}
-                  </p>
+                  <p className="compare-card-error-detail">ID: {result.id}</p>
                 </div>
               );
             }

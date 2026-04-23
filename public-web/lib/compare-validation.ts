@@ -58,7 +58,7 @@ export function validateCompareRequest(
     return {
       status: "empty",
       valid: false,
-      message: "Choose at least two areas to compare.",
+      message: "Choose at least two areas to compare from the homepage map.",
     };
   }
 
@@ -70,11 +70,34 @@ export function validateCompareRequest(
     };
   }
 
-  if (ids.length > MAX_COMPARE_IDS) {
+    if (ids.length > MAX_COMPARE_IDS) {
     return {
       status: "over_limit",
       valid: false,
       message: `Compare supports up to ${MAX_COMPARE_IDS} areas. You selected ${ids.length}.`,
+    };
+  }
+
+  const LOCAL_ID_RE = /^\d{5}$/;
+
+  if (level === "state" && ids.some((id) => LOCAL_ID_RE.test(id))) {
+    return {
+      status: "mixed_level",
+      valid: false,
+      message:
+        "This compare link mixes state and local area identifiers. Use one compare level only.",
+    };
+  }
+
+  if (
+    (level === "county" || level === "metro") &&
+    ids.some((id) => STATE_FIPS_RE.test(id))
+  ) {
+    return {
+      status: "mixed_level",
+      valid: false,
+      message:
+        "This compare link mixes state and local area identifiers. Use one compare level only.",
     };
   }
 

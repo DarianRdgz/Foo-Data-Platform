@@ -24,6 +24,8 @@ import HomeSummaryPanel from "@/components/home/HomeSummaryPanel";
 import StateMapWorkspace from "@/components/home/StateMapWorkspace";
 import StateSelectionModal from "@/components/home/StateSelectionModal";
 import { ComparePanel } from "@/components/compare/ComparePanel";
+import Link from "next/link";
+import { buildDirectCompareUrlFromHomeState } from "@/lib/compare-query";
 
 interface SummaryTarget {
   key: string;
@@ -253,6 +255,14 @@ export default function HomeClientShell() {
     }));
   }, [compareLevel, homeState.compareIds]);
 
+  const directCompareHref = useMemo(() => {
+    if (homeState.tab !== "compare" || homeState.compareIds.length < 2) {
+      return null;
+    }
+
+    return buildDirectCompareUrlFromHomeState(homeState);
+  }, [homeState]);
+
   const focusedAreaHref = useMemo(() => {
     if (summaryTarget.geoLevel === "state" && summaryTarget.identifier) {
       return `/area/state/${summaryTarget.identifier}`;
@@ -332,17 +342,30 @@ export default function HomeClientShell() {
                 )}
 
                 {compareSelectionLabels.length > 0 ? (
-                  <button
-                    type="button"
-                    className="text-link-button"
-                    onClick={() => {
-                      applyState((prev) =>
-                        normalizeHomeState({ ...prev, compareIds: [] })
-                      );
-                    }}
-                  >
-                    Clear all
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      className="text-link-button"
+                      onClick={() => {
+                        applyState((prev) =>
+                          normalizeHomeState({ ...prev, compareIds: [] })
+                        );
+                      }}
+                    >
+                      Clear all
+                    </button>
+
+                    {directCompareHref ? (
+                      <Link
+                        href={directCompareHref}
+                        className="compare-share-link"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Open compare page ↗
+                      </Link>
+                    ) : null}
+                  </>
                 ) : null}
               </div>
             </>

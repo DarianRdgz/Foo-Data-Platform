@@ -281,9 +281,10 @@ export function getNationalArea(): Promise<AreaResponse> {
  */
 export function getArea(
   geoLevel: AreaDetailGeoLevel,
-  identifier: string
+  identifier: string,
+  signal?: AbortSignal
 ): Promise<AreaResponse> {
-  return apiGet<AreaResponse>(`/api/area/${geoLevel}/${identifier}`);
+  return apiGet<AreaResponse>(`/api/area/${geoLevel}/${identifier}`, signal);
 }
 
 export interface CompareAreaResult {
@@ -291,13 +292,17 @@ export interface CompareAreaResult {
   status: "fulfilled" | "rejected";
   area: AreaResponse | null;
   error: string | null;
+  apiStatus?: PublicApiStatus | null;
 }
 
 export async function getAreasForComparison(
   level: ComparableGeoLevel,
-  ids: string[]
+  ids: string[],
+  signal?: AbortSignal
 ): Promise<CompareAreaResult[]> {
-  const results = await Promise.allSettled(ids.map((id) => getArea(level, id)));
+  const results = await Promise.allSettled(
+    ids.map((id) => getArea(level, id, signal))
+  );
 
   return results.map((result, index) => {
     if (result.status === "fulfilled") {
@@ -309,16 +314,15 @@ export async function getAreasForComparison(
       };
     }
 
-    const message =
-      result.reason instanceof Error
-        ? result.reason.message
-        : "Could not load this area.";
+    const reason = result.reason;
+    const isPublicError = reason instanceof PublicApiError;
 
     return {
       id: ids[index],
       status: "rejected",
       area: null,
-      error: message,
+      error: isPublicError ? reason.message : "Could not load this area.",
+      apiStatus: isPublicError ? reason.apiStatus : undefined,
     };
   });
 }
