@@ -1,4 +1,6 @@
 import Link from "next/link";
+import type { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/metadata";
 import { ComparePageClient } from "@/components/compare/ComparePageClient";
 import { parseDirectCompareParams } from "@/lib/compare-query";
 
@@ -9,9 +11,12 @@ interface ComparePageProps {
   }>;
 }
 
-export const metadata = {
-  title: "Compare Areas — aboutmyarea.net",
-};
+export const metadata: Metadata = buildPageMetadata({
+  title: "Compare Areas",
+  description:
+    "Compare housing, economic, and risk data across states, counties, and metro areas on aboutmyarea.net.",
+  path: "/compare",
+});
 
 export default async function ComparePage({ searchParams }: ComparePageProps) {
   const params = await searchParams;

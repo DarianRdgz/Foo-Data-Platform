@@ -1,24 +1,19 @@
 // public-web/app/not-found.tsx
 import Link from "next/link";
 
-export default function NotFound() {
+export default function NotFoundPage() {
   return (
-    <div className="not-found-page">
-      <span className="not-found-code">404</span>
-      <h1>We couldn&apos;t find that page</h1>
-      <p>
-        The page or area you requested does not exist, may have moved, or may
-        use an invalid public identifier.
+    <main className="public-error-page">
+      <p className="public-error-kicker">Page not found</p>
+      <h1 className="public-error-title">We couldn’t find that route.</h1>
+      <p className="public-error-message">
+        Return to the homepage map or browse states to continue exploring.
       </p>
-
-      <div className="stub-links centered-links">
-        <Link href="/" className="stub-link">
-          Go home
-        </Link>
-        <Link href="/browse" className="stub-link">
-          Browse areas
-        </Link>
+      <div className="public-error-actions">
+        <Link href="/" className="btn-primary">Home</Link>
+        <Link href="/browse" className="btn-secondary">Browse states</Link>
+        <Link href="/compare" className="btn-secondary">Compare areas</Link>
       </div>
-    </div>
+    </main>
   );
 }

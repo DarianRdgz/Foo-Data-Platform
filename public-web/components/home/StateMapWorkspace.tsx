@@ -1,7 +1,7 @@
 // public-web/components/home/StateMapWorkspace.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { geoAlbersUsa, geoPath } from "d3-geo";
 import { getMapTiles } from "@/lib/api";
 import type { HomeBrowseLevel, HomeTab } from "@/lib/home-query";
@@ -40,6 +40,7 @@ interface Props {
   onBackToUnitedStates: () => void;
   onBackToState: () => void;
   onCompareToggle?: (id: string, level: ComparableGeoLevel) => void;
+  quickViewPanel?: ReactNode;
 }
 
 interface RenderStateRegion extends StateMapRegion {
@@ -91,6 +92,7 @@ export default function StateMapWorkspace({
   onBackToUnitedStates,
   onBackToState,
   onCompareToggle,
+  quickViewPanel,
 }: Props) {
   const [stateBoundaries, setStateBoundaries] = useState<StateBoundaryFeature[]>(
     []
@@ -772,6 +774,8 @@ export default function StateMapWorkspace({
           No county drilldown data is available for this state yet.
         </div>
       )}
+
+      {quickViewPanel}
 
       <div className="map-legend">
         {showNationalMap ? (

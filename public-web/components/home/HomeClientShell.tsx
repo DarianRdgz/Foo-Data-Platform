@@ -45,7 +45,7 @@ export default function HomeClientShell() {
   const [homeState, setHomeState] = useState<HomeUrlState>(parsedUrlState);
   const [selectedCountyFips, setSelectedCountyFips] = useState<string | null>(null);
   const [selectedMetroCbsa, setSelectedMetroCbsa] = useState<string | null>(null);
-  const [isStateModalOpen, setIsStateModalOpen] = useState(false);
+  const [isQuickViewOpen, setIsQuickViewOpen] = useState(false);
   const [levelChangeMessage, setLevelChangeMessage] = useState<string | null>(null);
 
   const summaryCacheRef = useRef<Record<string, AreaResponse>>({});
@@ -68,14 +68,14 @@ export default function HomeClientShell() {
     if (!homeState.selectedStateFips) {
       setSelectedCountyFips(null);
       setSelectedMetroCbsa(null);
-      setIsStateModalOpen(false);
+      setIsQuickViewOpen(false);
       return;
     }
 
     if (homeState.tab !== "browse") {
       setSelectedCountyFips(null);
       setSelectedMetroCbsa(null);
-      setIsStateModalOpen(false);
+      setIsQuickViewOpen(false);
       return;
     }
 
@@ -88,7 +88,7 @@ export default function HomeClientShell() {
     }
 
     if (homeState.selectedBrowseLevel !== "state") {
-      setIsStateModalOpen(false);
+      setIsQuickViewOpen(false);
     }
   }, [
     homeState.selectedStateFips,
@@ -297,7 +297,7 @@ export default function HomeClientShell() {
         onTabChange={(nextTab) => {
           setSelectedCountyFips(null);
           setSelectedMetroCbsa(null);
-          setIsStateModalOpen(false);
+          setIsQuickViewOpen(false);
           setLevelChangeMessage(null);
 
           applyState((prev) => switchHomeTab(prev, nextTab));
@@ -393,7 +393,7 @@ export default function HomeClientShell() {
           setSelectedMetroCbsa(null);
 
           applyState((prev) => selectBrowseState(prev, stateFips));
-          setIsStateModalOpen(true);
+          setIsQuickViewOpen(true);
         }}
         onBrowseSelectCounty={(countyFips) => {
           setSelectedMetroCbsa(null);
@@ -412,7 +412,7 @@ export default function HomeClientShell() {
         onBackToUnitedStates={() => {
           setSelectedCountyFips(null);
           setSelectedMetroCbsa(null);
-          setIsStateModalOpen(false);
+          setIsQuickViewOpen(false);
 
           applyState((prev) => clearBrowseStateFocus(prev));
         }}
@@ -425,7 +425,7 @@ export default function HomeClientShell() {
         onCompareToggle={(id, level) => {
           setSelectedCountyFips(null);
           setSelectedMetroCbsa(null);
-          setIsStateModalOpen(false);
+          setIsQuickViewOpen(false);
           setLevelChangeMessage(null);
 
           applyState((prev) =>
@@ -439,6 +439,23 @@ export default function HomeClientShell() {
             )
           );
         }}
+        quickViewPanel={
+          homeState.tab === "browse" &&
+          homeState.selectedStateFips !== null &&
+          homeState.selectedBrowseLevel === "state" &&
+          isQuickViewOpen ? (
+            <StateSelectionModal
+              isOpen
+              stateName={selectedStateName}
+              summary={summary}
+              onClose={() => setIsQuickViewOpen(false)}
+              onEnterCountyView={() => {
+                setIsQuickViewOpen(false);
+                applyState((prev) => setBrowseLevel(prev, "county"));
+              }}
+            />
+          ) : null
+        }
       />
 
       {homeState.tab === "compare" ? (
@@ -472,7 +489,7 @@ export default function HomeClientShell() {
           onBackToUnitedStates={() => {
             setSelectedCountyFips(null);
             setSelectedMetroCbsa(null);
-            setIsStateModalOpen(false);
+            setIsQuickViewOpen(false);
 
             applyState((prev) => clearBrowseStateFocus(prev));
           }}
@@ -503,22 +520,6 @@ export default function HomeClientShell() {
         }}
         />
       )}
-
-      <StateSelectionModal
-        isOpen={
-          homeState.tab === "browse" &&
-          homeState.selectedStateFips !== null &&
-          homeState.selectedBrowseLevel === "state" &&
-          isStateModalOpen
-        }
-        stateName={selectedStateName}
-        summary={summary}
-        onClose={() => setIsStateModalOpen(false)}
-        onEnterCountyView={() => {
-          setIsStateModalOpen(false);
-          applyState((prev) => setBrowseLevel(prev, "county"));
-        }}
-      />
     </div>
   );
 }

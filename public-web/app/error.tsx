@@ -1,36 +1,33 @@
-// public-web/app/error.tsx
 "use client";
 
-import Link from "next/link";
 import { useEffect } from "react";
+import Link from "next/link";
 
-interface Props {
+export default function GlobalError({
+  error,
+  reset,
+}: {
   error: Error & { digest?: string };
   reset: () => void;
-}
-
-export default function ErrorPage({ error, reset }: Props) {
+}) {
   useEffect(() => {
-    console.error("[public-web error boundary]", error);
+    console.error(error);
   }, [error]);
 
   return (
-    <div className="error-page">
-      <div className="error-icon">⚠️</div>
-      <h1>Something went wrong</h1>
-      <p>
-        We ran into an unexpected problem while loading this page. You can try
-        again or return to the home page.
+    <main className="public-error-page">
+      <p className="public-error-kicker">Something went wrong</p>
+      <h1 className="public-error-title">We couldn’t load this page.</h1>
+      <p className="public-error-message">
+        Try refreshing, return to the homepage, or continue browsing public beta areas.
       </p>
-
-      <div className="error-actions">
-        <button type="button" className="btn-primary" onClick={reset}>
+      <div className="public-error-actions">
+        <button type="button" className="btn-primary" onClick={() => reset()}>
           Try again
         </button>
-        <Link href="/" className="btn-secondary">
-          Go home
-        </Link>
+        <Link href="/" className="btn-secondary">Home</Link>
+        <Link href="/browse" className="btn-secondary">Browse states</Link>
       </div>
-    </div>
+    </main>
   );
 }

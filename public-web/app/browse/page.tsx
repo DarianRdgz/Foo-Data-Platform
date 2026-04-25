@@ -1,5 +1,6 @@
 // public-web/app/browse/page.tsx
 import type { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/metadata";
 import Link from "next/link";
 import { US_STATES } from "@/lib/us-states";
 import {
@@ -8,10 +9,12 @@ import {
   buildHomepageStateHref,
 } from "@/lib/browse";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPageMetadata({
   title: "Browse States",
-  description: "Browse public state entry pages for aboutmyarea.net.",
-};
+  description:
+    "Browse states to explore county and metro area data on aboutmyarea.net.",
+  path: "/browse",
+});
 
 export default function BrowsePage() {
   return (

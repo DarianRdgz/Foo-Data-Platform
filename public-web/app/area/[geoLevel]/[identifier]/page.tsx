@@ -1,5 +1,6 @@
 // public-web/app/area/[geoLevel]/[identifier]/page.tsx
 import type { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/metadata";
 import { notFound } from "next/navigation";
 import {
   getArea,
@@ -27,23 +28,21 @@ function isSupportedDetailLevel(
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { geoLevel, identifier } = await params;
 
-  if (
-    !isValidAreaDetailGeoLevel(geoLevel) ||
-    !isValidAreaIdentifier(geoLevel, identifier) ||
-    geoLevel === "zip"
-  ) {
+  if (!isValidAreaDetailGeoLevel(geoLevel) || !isValidAreaIdentifier(geoLevel, identifier)) {
     return { title: "Area" };
   }
 
   try {
-    const area = await getArea(geoLevel, identifier);
-    return {
+    const area = await getArea(geoLevel as AreaDetailGeoLevel, identifier);
+    const levelLabel = geoLevel.charAt(0).toUpperCase() + geoLevel.slice(1);
+
+    return buildPageMetadata({
       title: area.displayLabel,
-    };
+      description: `${levelLabel} data for ${area.displayLabel} — housing, economic, and risk indicators on aboutmyarea.net.`,
+      path: `/area/${geoLevel}/${identifier}`,
+    });
   } catch {
-    return {
-      title: `${geoLevel} ${identifier}`,
-    };
+    return { title: `${geoLevel} ${identifier}` };
   }
 }
 

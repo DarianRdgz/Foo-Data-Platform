@@ -8,6 +8,30 @@ interface Props {
 }
 
 export function AreaDetailSections({ model }: Props) {
+  const allEmpty =
+    model.sections.every((section) =>
+      section.metrics.every((metric) => !metric.available)
+    ) && !model.hasHistory;
+
+  if (allEmpty) {
+    return (
+      <div className="area-empty-state">
+        <p className="area-empty-title">{model.displayLabel}</p>
+        <p className="area-empty-message">
+          Beta data is not yet available for this area. Check back as coverage expands.
+        </p>
+        <div className="stub-links">
+          <Link href={model.parentStateHref ?? "/browse"} className="stub-link">
+            {model.parentStateHref ? "← Parent state" : "← Browse states"}
+          </Link>
+          <Link href="/" className="stub-link">
+            ← Home
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="detail-header">

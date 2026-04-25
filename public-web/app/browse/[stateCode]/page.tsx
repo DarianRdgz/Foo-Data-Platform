@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/metadata";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -20,18 +21,16 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { stateCode } = await params;
-
-  if (!isValidStateCode(stateCode)) {
-    return { title: "Browse state" };
-  }
+  if (!isValidStateCode(stateCode)) return { title: "Browse state" };
 
   const state = getStateByCode(stateCode);
   const stateName = state?.name ?? stateCode;
 
-  return {
+  return buildPageMetadata({
     title: `Browse ${stateName}`,
-    description: `Crawlable area listing for ${stateName} on aboutmyarea.net.`,
-  };
+    description: `Browse counties and metro areas in ${stateName} on aboutmyarea.net.`,
+    path: `/browse/${stateCode}`,
+  });
 }
 
 export default async function BrowseStatePage({ params }: Props) {

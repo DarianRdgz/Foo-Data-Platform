@@ -14,6 +14,7 @@ import {
   type CompareAreaResult,
   type AreaResponse,
 } from "@/lib/api";
+import { CompareCardsSkeleton } from "@/components/site/PageSkeletons";
 
 interface ComparePanelProps {
   level: string | null | undefined;
@@ -171,7 +172,7 @@ export function ComparePanel({
 
       {loading && (
         <div className="compare-loading" aria-live="polite">
-          Loading comparison…
+          <CompareCardsSkeleton count={Math.max(ids.length, 2)} />
         </div>
       )}
 
